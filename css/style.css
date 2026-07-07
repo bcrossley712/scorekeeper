@@ -170,8 +170,6 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 .suit-black{ color: var(--ink); }
 .suit-red{ color: var(--pip); }
 
-.rook-color-dots{ display:flex; gap:6px; align-items:center; }
-.rook-color-dots span{ width:15px; height:15px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.15); }
 
 .color-swatch-row{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 4px; }
 .color-swatch{ width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid transparent; }

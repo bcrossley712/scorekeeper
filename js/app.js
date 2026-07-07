@@ -171,9 +171,7 @@ var Screens = {
       <div class="game-grid">
         ${GAME_ORDER.map(key => {
           const r = DEFAULT_RULES[key];
-          const fallback = key === "rook"
-            ? `<div class="rook-color-dots"><span style="background:#B23A2E"></span><span style="background:#2B6350"></span><span style="background:#232323"></span><span style="background:#D9B23C"></span></div>`
-            : `<div class="suit-fallback ${suitClass(GAME_SUITS[key])}">${GAME_SUITS[key]}</div>`;
+          const fallback = `<div class="suit-fallback ${suitClass(GAME_SUITS[key])}">${GAME_SUITS[key]}</div>`;
           return `
           <div class="game-tile" onclick="Setup.pick('${key}')">
             <div class="tile-photo">${fallback}</div>
