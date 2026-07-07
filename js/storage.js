@@ -39,8 +39,27 @@ var Storage = {
     if (!rules) {
       rules = JSON.parse(JSON.stringify(DEFAULT_RULES)); // deep copy default on first run
       this._write(STORAGE_KEYS.rules, rules);
+      return rules;
     }
-    return rules;
+    // Someone's saved copy may predate a later change to DEFAULT_RULES (a new field,
+    // a new game, etc). Fill in anything missing without touching what they've
+    // already customized, then persist the healed copy so this only happens once.
+    const merged = this._mergeMissing(rules, DEFAULT_RULES);
+    this._write(STORAGE_KEYS.rules, merged);
+    return merged;
+  },
+  _mergeMissing(target, source) {
+    Object.keys(source).forEach(key => {
+      if (!(key in target)) {
+        target[key] = JSON.parse(JSON.stringify(source[key]));
+      } else if (
+        source[key] && typeof source[key] === "object" && !Array.isArray(source[key]) &&
+        target[key] && typeof target[key] === "object" && !Array.isArray(target[key])
+      ) {
+        this._mergeMissing(target[key], source[key]);
+      }
+    });
+    return target;
   },
   saveRules(rules) { return this._write(STORAGE_KEYS.rules, rules); },
 
