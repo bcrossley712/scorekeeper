@@ -407,6 +407,69 @@ var Play = {
     this.commitHand(entries);
   },
 
+  showToast(message) {
+    let container = document.getElementById("toastContainer");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "toastContainer";
+      container.className = "toast-container";
+      document.body.appendChild(container);
+    }
+    container.innerHTML = ""; // rapid repeats replace, never stack
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add("show"));
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 300);
+    }, 1700);
+  },
+
+  _validationFailStreak: 0,
+  toastForValidationFail() {
+    this._validationFailStreak++;
+    if (this._validationFailStreak === 1) return "Hey, you missed something!";
+    if (this._validationFailStreak === 2) return "Really...? Check the red one.";
+    return "C'mon now 👀";
+  },
+  resetValidationStreak() {
+    this._validationFailStreak = 0;
+  },
+
+  flagFieldError(id, message) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    this.clearFieldError(id);
+    el.classList.add("input-error");
+    const msg = document.createElement("div");
+    msg.className = "field-error-msg";
+    msg.dataset.forField = id;
+    msg.textContent = message || "*missing value";
+    const row = el.closest(".field-row") || el;
+    row.insertAdjacentElement("afterend", msg);
+    const clearOnce = () => this.clearFieldError(id);
+    el.addEventListener("input", clearOnce, { once: true });
+    el.addEventListener("change", clearOnce, { once: true });
+    el.focus();
+    if (typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    this.showToast(this.toastForValidationFail());
+  },
+
+  clearFieldError(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove("input-error");
+    const msg = document.querySelector(`.field-error-msg[data-for-field="${id}"]`);
+    if (msg) msg.remove();
+  },
+
+  clearRookFieldErrors() {
+    ["rookBidder", "rookBid", "rookTrump", "rookCapturedBid"].forEach(id => this.clearFieldError(id));
+  },
+
   saveRook() {
     const game = App.state.game;
     const manualMode = document.getElementById("rookManualSwitch").classList.contains("on");
@@ -420,19 +483,20 @@ var Play = {
       });
       this.commitHand(entries, {});
     } else {
+      this.clearRookFieldErrors();
       const bidderPlayerId = document.getElementById("rookBidder").value;
       const trump = document.getElementById("rookTrump").value;
       const bidRaw = document.getElementById("rookBid").value;
       const capturedRaw = document.getElementById("rookCapturedBid").value;
 
-      if (bidderPlayerId === "") { alert("Select who won the bid before saving."); return; }
-      if (bidRaw === "") { alert("Enter the bid amount before saving."); return; }
-      if (trump === "") { alert("Select the trump color before saving."); return; }
-      if (capturedRaw === "") { alert("Enter points captured before saving."); return; }
+      if (bidderPlayerId === "") { this.flagFieldError("rookBidder", "*Select who won the bid"); return; }
+      if (bidRaw === "") { this.flagFieldError("rookBid", "*missing value"); return; }
+      if (trump === "") { this.flagFieldError("rookTrump", "*Select a trump color"); return; }
+      if (capturedRaw === "") { this.flagFieldError("rookCapturedBid", "*missing value"); return; }
 
       let bid = Number(bidRaw) || 0;
-      if (bid > 100) { alert("A bid can't be more than 100 — the whole hand is only worth 100 points."); return; }
-      if (bid < 1) { alert("Enter a valid bid amount."); return; }
+      if (bid > 100) { this.flagFieldError("rookBid", "*Can't bid more than 100"); return; }
+      if (bid < 1) { this.flagFieldError("rookBid", "*Enter a valid bid"); return; }
 
       const rawCaptured = Number(capturedRaw) || 0;
       const capturedByBidder = Math.max(0, Math.min(100, rawCaptured));
@@ -502,6 +566,7 @@ var Play = {
   },
 
   commitHand(entries, handMeta) {
+    this.resetValidationStreak();
     const game = App.state.game;
     const hand = { handNum: game.hands.length + 1, entries };
     if (handMeta) hand.handMeta = handMeta;

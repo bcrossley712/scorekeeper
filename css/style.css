@@ -137,6 +137,12 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 .empty-hint{ font-size:13.5px; color:#6b6259; line-height:1.5; }
 .hint-text{ font-size:12.5px; color:#6b6259; line-height:1.5; }
 .validation-msg{ color:#f0b7ae; font-size:12.5px; text-align:center; margin-top:8px; font-weight:700;}
+.input-error{ border-color:#B23A2E !important; background:#FBEAE7 !important; }
+.field-error-msg{ color:#B23A2E; font-size:11.5px; font-weight:800; text-align:right; margin:-4px 0 10px; }
+
+.toast-container{ position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:100; pointer-events:none; }
+.toast{ background:var(--felt-dark); color:var(--cream); padding:11px 20px; border-radius:24px; font-weight:700; font-size:13.5px; box-shadow:0 10px 24px rgba(0,0,0,.4); opacity:0; transform:translateY(12px); transition:opacity .25s ease, transform .25s ease; white-space:nowrap; }
+.toast.show{ opacity:1; transform:translateY(0); }
 
 .firstrun-banner{ display:flex; align-items:center; justify-content:space-between; background:var(--brass-light); border-radius:10px; padding:10px 12px; margin-bottom:14px; font-size:13px; font-weight:700; color:#5c4415; }
 .firstrun-banner button{ background:none;border:none;font-size:18px;cursor:pointer;color:#5c4415; }
