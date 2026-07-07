@@ -110,7 +110,12 @@ var Screens = {
 
       <div class="section-label">Get playing</div>
       <button class="btn-primary" ${game ? "disabled" : ""} onclick="Setup.begin()">
-        &#127920; ${game ? "Finish current game first" : "Deal a New Game"}
+        <svg width="24" height="19" viewBox="0 0 140 110" style="vertical-align:middle;margin-right:8px;" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="25" width="50" height="70" rx="8" fill="#F6F1E4" stroke="#2A2622" stroke-width="3" transform="rotate(-18 45 60)"/>
+          <rect x="70" y="25" width="50" height="70" rx="8" fill="#F6F1E4" stroke="#2A2622" stroke-width="3" transform="rotate(18 95 60)"/>
+          <rect x="45" y="20" width="50" height="70" rx="8" fill="#F6F1E4" stroke="#2A2622" stroke-width="3"/>
+        </svg>
+        ${game ? "Finish current game first" : "Deal a New Game"}
       </button>
 
       <div class="link-row">
@@ -278,7 +283,14 @@ var Screens = {
       ${s.gameKey !== "custom" && gameRules.endCondition.type !== "manual" && gameRules.endCondition.type !== "phase" ? `
       <div class="card">
         <div class="stitch"></div>
-        <h3>${gameRules.endCondition.type === "target" ? "Play to what score?" : "How many hands?"}</h3>
+        <h3>How should this game end?</h3>
+        ${gameRules.endCondition.allowChoice ? `
+          <div class="segmented" style="margin-bottom:10px;">
+            <button class="${s.endType === "target" ? "on" : ""}" onclick="Setup.setEndType('target')">Target score</button>
+            <button class="${s.endType === "hands" ? "on" : ""}" onclick="Setup.setEndType('hands')">Fixed hands</button>
+          </div>
+        ` : ``}
+        <p class="hint-text" style="margin-bottom:8px;">${s.endType === "target" ? "First to reach this score wins." : "Play exactly this many hands, then the best total wins."}</p>
         <input class="num-input" type="number" value="${s.endValue}" oninput="Setup.updateEndValue(this.value)" />
       </div>` : ``}
 
@@ -323,14 +335,15 @@ var Screens = {
         <div class="card rook-info-card">
           <div class="stitch"></div>
           <div class="rook-info-label">Last hand's bid</div>
-          <div class="rook-info-main">${escapeHtml(game.lastRookInfo.biddingTeamName)} bid ${game.lastRookInfo.bid}, called ${game.lastRookInfo.trump}</div>
+          <div class="rook-info-main">${escapeHtml(game.lastRookInfo.biddingPlayerName)} (${escapeHtml(game.lastRookInfo.biddingTeamName.split(" (")[0])}) bid ${game.lastRookInfo.bid}, called ${game.lastRookInfo.trump}</div>
           <div class="rook-info-sub">${game.lastRookInfo.made ? "Made the bid" : "Set — lost the bid"}</div>
         </div>` : ``}
 
       <div class="section-label">Running Scoreboard</div>
       ${Play.scoreboard(game)}
 
-      <button class="btn-secondary danger" style="margin-top:16px;" onclick="Play.confirmEnd()">End Game Now</button>
+      <button class="btn-outline-dark" style="margin-top:14px;" ${game.hands.length === 0 ? "disabled" : ""} onclick="Play.undoLastHand()">Undo Last Hand</button>
+      <button class="btn-secondary danger" style="margin-top:10px;" onclick="Play.confirmEnd()">End Game Now</button>
     `;
   },
 
@@ -358,7 +371,8 @@ var Screens = {
           ${standings.map(s => `<tr><td>${escapeHtml(s.name)}${s.id === winnerId ? ' <span class="lead-badge">WINNER</span>' : ""}</td><td>${s.value}</td></tr>`).join("")}
         </table>
       </div>
-      <button class="btn-primary" style="margin-top:18px;" onclick="App.go('home')">Back to Home</button>
+      <button class="btn-primary" style="margin-top:18px;" onclick="Play.rematch()">Play Again (Same Players)</button>
+      <button class="btn-outline-dark" style="margin-top:10px;" onclick="App.go('home')">Back to Home</button>
     `;
   },
 

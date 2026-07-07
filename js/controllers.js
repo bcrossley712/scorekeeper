@@ -57,6 +57,7 @@ var Setup = {
       guestPlayers: [],
       useTeams: gr ? gr.teamMode === "forced" : false,
       teamAssignments: {},
+      endType: gr ? gr.endCondition.type : "manual",
       endValue: gr && gr.endCondition && gr.endCondition.value ? gr.endCondition.value : 10,
       customName: "",
       customWinLow: false,
@@ -64,6 +65,11 @@ var Setup = {
       customEndType: "manual"
     };
     App.go("setup");
+  },
+
+  setEndType(type) {
+    App.state.setup.endType = type;
+    App.render();
   },
 
   togglePlayer(id) {
@@ -126,11 +132,11 @@ var Setup = {
       const t1 = s.selectedPlayerIds.filter(id => s.teamAssignments[id] === 1);
       const t2 = s.selectedPlayerIds.filter(id => s.teamAssignments[id] === 2);
       const units = [];
-      if (t1.length) units.push({ id: "team1", name: "Team 1 (" + t1.map(id => byId[id].name).join(" & ") + ")", memberIds: t1 });
-      if (t2.length) units.push({ id: "team2", name: "Team 2 (" + t2.map(id => byId[id].name).join(" & ") + ")", memberIds: t2 });
+      if (t1.length) units.push({ id: "team1", name: "Team 1 (" + t1.map(id => byId[id].name).join(" & ") + ")", memberIds: t1, memberNames: t1.map(id => byId[id].name) });
+      if (t2.length) units.push({ id: "team2", name: "Team 2 (" + t2.map(id => byId[id].name).join(" & ") + ")", memberIds: t2, memberNames: t2.map(id => byId[id].name) });
       return units;
     }
-    return s.selectedPlayerIds.map(id => ({ id, name: byId[id].name, memberIds: [id] }));
+    return s.selectedPlayerIds.map(id => ({ id, name: byId[id].name, memberIds: [id], memberNames: [byId[id].name] }));
   },
 
   validationMessage() {
@@ -175,8 +181,8 @@ var Setup = {
       rulesSnapshot = JSON.parse(JSON.stringify(gr)); // SNAPSHOT — future rule edits won't affect this game
       winMode = gr.winMode;
       label = gr.label;
-      if (gr.endCondition.type === "target" || gr.endCondition.type === "hands") {
-        endCondition = { type: gr.endCondition.type, value: s.endValue };
+      if (s.endType === "target" || s.endType === "hands") {
+        endCondition = { type: s.endType, value: s.endValue };
       } else {
         endCondition = { type: gr.endCondition.type, value: gr.endCondition.value };
       }
@@ -259,13 +265,19 @@ var Play = {
       </div>
       <div id="rookBidFields">
         <div class="field-row"><label>Winning bidder</label>
-          <select id="rookBidder">${game.units.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join("")}</select>
+          <select id="rookBidder">
+            ${game.units.map(u => `
+              <optgroup label="${escapeHtml(u.name.split(" (")[0])}">
+                ${u.memberIds.map((mid, i) => `<option value="${mid}">${escapeHtml((u.memberNames && u.memberNames[i]) || mid)}</option>`).join("")}
+              </optgroup>
+            `).join("")}
+          </select>
         </div>
-        <div class="field-row"><label>Bid amount</label><input type="number" id="rookBid" placeholder="e.g. 120" /></div>
+        <div class="field-row"><label>Bid amount</label><input type="number" id="rookBid" class="input-compact" min="1" max="100" placeholder="e.g. 85" /></div>
         <div class="field-row"><label>Trump color called</label>
           <select id="rookTrump"><option>Red</option><option>Green</option><option>Black</option><option>Yellow</option></select>
         </div>
-        <div class="field-row"><label>Points captured by bidder</label><input type="number" id="rookCapturedBid" min="0" max="100" placeholder="0-100" /></div>
+        <div class="field-row"><label>Points captured by bidder</label><input type="number" id="rookCapturedBid" class="input-compact" min="0" max="100" placeholder="0-100" /></div>
         <p class="hint-text">The other team automatically gets what's left out of 100.</p>
       </div>
       <div id="rookManualFields" class="hidden">
@@ -404,21 +416,36 @@ var Play = {
       });
       this.commitHand(entries, {});
     } else {
-      const biddingTeamId = document.getElementById("rookBidder").value;
-      const bid = Number(document.getElementById("rookBid").value) || 0;
+      const bidRaw = document.getElementById("rookBid").value;
+      const capturedRaw = document.getElementById("rookCapturedBid").value;
+      if (bidRaw === "") { alert("Enter the bid amount before saving."); return; }
+      if (capturedRaw === "") { alert("Enter points captured before saving."); return; }
+
+      let bid = Number(bidRaw) || 0;
+      if (bid > 100) { alert("A bid can't be more than 100 — the whole hand is only worth 100 points."); return; }
+      if (bid < 1) { alert("Enter a valid bid amount."); return; }
+
+      const bidderPlayerId = document.getElementById("rookBidder").value;
       const trump = document.getElementById("rookTrump").value;
-      const rawCaptured = Number(document.getElementById("rookCapturedBid").value) || 0;
+      const rawCaptured = Number(capturedRaw) || 0;
       const capturedByBidder = Math.max(0, Math.min(100, rawCaptured));
-      const handMeta = { biddingTeamId, bid, trump };
+
+      const bidderUnit = game.units.find(u => u.memberIds.includes(bidderPlayerId)) || game.units[0];
+      const biddingTeamId = bidderUnit.id;
+      const bidderIndex = bidderUnit.memberIds.indexOf(bidderPlayerId);
+      const bidderName = bidderIndex >= 0 && bidderUnit.memberNames ? bidderUnit.memberNames[bidderIndex] : "Bidder";
+
+      const handMeta = { biddingTeamId, bid, trump, biddingPlayerName: bidderName };
       game.units.forEach(u => {
         const captured = u.id === biddingTeamId ? capturedByBidder : (100 - capturedByBidder);
         const entry = { manual: false, captured };
         entry.score = Engine.rook(entry, handMeta, u.id);
         entries[u.id] = entry;
       });
-      const bidderUnit = game.units.find(u => u.id === biddingTeamId);
+
       game.lastRookInfo = {
-        biddingTeamName: bidderUnit ? bidderUnit.name : "—",
+        biddingPlayerName: bidderName,
+        biddingTeamName: bidderUnit.name,
         bid, trump,
         made: capturedByBidder >= bid
       };
@@ -507,19 +534,82 @@ var Play = {
           </table>
         </div>`;
     }
-    const handNums = game.hands.map(h => h.handNum);
-    return `
+    const totalsTable = `
       <div class="ledger">
         <table>
-          <tr><th>Player/Team</th>${handNums.map(n => `<th>H${n}</th>`).join("")}<th>Total</th></tr>
+          <tr><th>Player/Team</th><th>Total</th></tr>
           ${standings.map((s, i) => `
             <tr class="${i === 0 ? "totalrow" : ""}">
               <td>${escapeHtml(s.name)}${i === 0 ? ' <span class="lead-badge">LEADING</span>' : ""}</td>
-              ${game.hands.map(h => `<td>${h.entries[s.id] ? h.entries[s.id].score : (h.winnerId ? "" : 0)}</td>`).join("")}
               <td>${s.value}</td>
             </tr>`).join("")}
         </table>
       </div>`;
+    if (game.hands.length === 0) return totalsTable;
+    const handHistory = `
+      <div class="hand-history">
+        ${game.hands.slice().reverse().map(h => `
+          <div class="hand-row">
+            <div class="hand-row-title">Hand ${h.handNum}</div>
+            <div class="hand-row-scores">
+              ${game.units.map(u => `<span class="hand-score-chip">${escapeHtml(u.name.split(" (")[0])}: ${h.entries[u.id] ? h.entries[u.id].score : 0}</span>`).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>`;
+    return totalsTable + handHistory;
+  },
+
+  rematch() {
+    const finished = App.state.lastFinishedGame;
+    if (!finished) return;
+    const newGame = {
+      id: Storage.uid(),
+      gameKey: finished.gameKey,
+      customName: finished.customName,
+      units: finished.units,
+      participantIds: finished.units.map(u => u.id),
+      mode: finished.mode,
+      winMode: finished.winMode,
+      rulesSnapshot: finished.rulesSnapshot,
+      endCondition: finished.endCondition,
+      hands: [],
+      status: "active",
+      createdAt: Date.now()
+    };
+    Storage.saveActiveGame(newGame);
+    App.state.game = newGame;
+    App.state.lastFinishedGame = null;
+    App.state.entryDraft = {};
+    App.go("play");
+  },
+
+  undoLastHand() {
+    const game = App.state.game;
+    if (!game || game.hands.length === 0) return;
+    if (!confirm("Remove the last hand? You'll need to re-enter it.")) return;
+    game.hands.pop();
+
+    if (game.gameKey === "rook") {
+      const prevHand = game.hands[game.hands.length - 1];
+      if (prevHand && prevHand.handMeta && prevHand.handMeta.biddingTeamId) {
+        const meta = prevHand.handMeta;
+        const bidderUnit = game.units.find(u => u.id === meta.biddingTeamId);
+        const bidderEntry = prevHand.entries[meta.biddingTeamId];
+        game.lastRookInfo = {
+          biddingPlayerName: meta.biddingPlayerName || "Bidder",
+          biddingTeamName: bidderUnit ? bidderUnit.name : "—",
+          bid: meta.bid,
+          trump: meta.trump,
+          made: bidderEntry ? bidderEntry.score >= 0 : true
+        };
+      } else {
+        game.lastRookInfo = null; // previous hand was manual, or no hands left — nothing to show
+      }
+    }
+
+    Storage.saveActiveGame(game);
+    App.render();
   },
 
   confirmEnd() {

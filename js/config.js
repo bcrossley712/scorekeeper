@@ -11,12 +11,12 @@ var DEFAULT_RULES = {
     winMode: "high",              // higher score wins
     teamMode: "forced",           // always 2 v 2
     entryType: "rook",            // custom entry screen (bid/trump/points)
-    endCondition: { type: "target", value: 500 },
+    endCondition: { type: "target", value: 500, allowChoice: true },
     info: [
       "Played in fixed partnerships (2 v 2).",
       "Each hand, the winning bidder's team must capture at least their bid in points, or they lose the bid amount instead of scoring the points they captured.",
       "The non-bidding team always scores whatever points they captured, bid or no bid.",
-      "Trump suit is recorded for the hand history but doesn't change scoring.",
+      "Trump color (red, green, black, or yellow) is recorded for the hand history but doesn't change scoring.",
       "First team to the target score wins (default 500 — editable per game)."
     ]
   },
@@ -26,7 +26,7 @@ var DEFAULT_RULES = {
     winMode: "high",
     teamMode: "choice",           // solo or teams
     entryType: "handfoot",
-    endCondition: { type: "hands", value: 4 },
+    endCondition: { type: "hands", value: 4, allowChoice: true },
     cardValues: {
       joker: 50, two: 20, ace: 15,
       tenPlus: 10,   // 10 through King
