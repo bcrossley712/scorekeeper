@@ -121,10 +121,11 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 
 .num-input, .text-input{ width:100%; padding:14px; font-size:18px; font-family:'Fraunces',serif; border:2px solid rgba(42,38,34,.15); border-radius:10px; text-align:center; font-weight:600; color:var(--ink); background:white; }
 .text-input{ text-align:left; font-family:'Nunito Sans',sans-serif; font-size:15px; }
-.field-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+.field-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
 .field-row label{ font-size:13px; font-weight:700; color:#5c5348; flex:1 1 auto; min-width:0; }
-.field-row input, .field-row select{ flex:1 1 auto; min-width:0; max-width:100%; padding:10px; border-radius:8px; border:1.5px solid rgba(42,38,34,.15); font-size:14px; }
-.field-row input.input-compact{ flex:0 1 5rem; width:auto; min-width:3.5rem; max-width:5rem; text-align:center; }
+.field-row select{ flex:0 1 8rem; min-width:5rem; padding:10px; border-radius:8px; border:1.5px solid rgba(42,38,34,.15); font-size:14px; }
+.field-row input{ flex:0 1 auto; width:5.5rem; min-width:3.5rem; padding:10px; border-radius:8px; border:1.5px solid rgba(42,38,34,.15); font-size:14px; text-align:center; }
+.field-row input.input-compact{ width:6.5rem; }
 
 .entry-unit-block{ background:var(--cream-dim); border-radius:10px; padding:12px; margin-bottom:12px; }
 .unit-label{ font-family:'Fraunces',serif; font-weight:600; font-size:15px; margin-bottom:8px; }
@@ -160,15 +161,12 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 
 .edit-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px; }
 .edit-row span{ font-size:13.5px; font-weight:700; color:#5c5348; flex:1 1 auto; min-width:0; }
-.edit-row input{ flex:0 1 5.5rem; width:auto; min-width:3.5rem; max-width:5.5rem; padding:8px; border-radius:8px; border:1.5px solid rgba(42,38,34,.15); font-size:14px; text-align:center; }
+.edit-row input{ flex:0 0 auto; width:5rem; min-width:3.5rem; padding:8px; border-radius:8px; border:1.5px solid rgba(42,38,34,.15); font-size:14px; text-align:center; }
 
 .fab-add{ background:none;border:1.5px dashed rgba(42,38,34,.25); color:#6b6259; border-radius:10px; padding:12px; width:100%; font-weight:700; font-size:13.5px; cursor:pointer; margin-top:6px; }
 
 @media (max-width: 380px){
   .cardval-grid{ grid-template-columns:repeat(3,1fr); }
-  .field-row{ flex-direction:column; align-items:stretch; }
-  .field-row label{ margin-bottom:2px; }
-  .field-row input:not(.input-compact), .field-row select{ width:100%; }
 }
 
 /* ---- fixes & additions from round 2 feedback ---- */

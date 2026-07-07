@@ -266,6 +266,7 @@ var Play = {
       <div id="rookBidFields">
         <div class="field-row"><label>Winning bidder</label>
           <select id="rookBidder">
+            <option value="" disabled selected>Select bidder</option>
             ${game.units.map(u => `
               <optgroup label="${escapeHtml(u.name.split(" (")[0])}">
                 ${u.memberIds.map((mid, i) => `<option value="${mid}">${escapeHtml((u.memberNames && u.memberNames[i]) || mid)}</option>`).join("")}
@@ -275,7 +276,10 @@ var Play = {
         </div>
         <div class="field-row"><label>Bid amount</label><input type="number" id="rookBid" class="input-compact" min="1" max="100" placeholder="e.g. 85" /></div>
         <div class="field-row"><label>Trump color called</label>
-          <select id="rookTrump"><option>Red</option><option>Green</option><option>Black</option><option>Yellow</option></select>
+          <select id="rookTrump">
+            <option value="" disabled selected>Select color</option>
+            <option>Red</option><option>Green</option><option>Black</option><option>Yellow</option>
+          </select>
         </div>
         <div class="field-row"><label>Points captured by bidder</label><input type="number" id="rookCapturedBid" class="input-compact" min="0" max="100" placeholder="0-100" /></div>
         <p class="hint-text">The other team automatically gets what's left out of 100.</p>
@@ -416,17 +420,20 @@ var Play = {
       });
       this.commitHand(entries, {});
     } else {
+      const bidderPlayerId = document.getElementById("rookBidder").value;
+      const trump = document.getElementById("rookTrump").value;
       const bidRaw = document.getElementById("rookBid").value;
       const capturedRaw = document.getElementById("rookCapturedBid").value;
+
+      if (bidderPlayerId === "") { alert("Select who won the bid before saving."); return; }
       if (bidRaw === "") { alert("Enter the bid amount before saving."); return; }
+      if (trump === "") { alert("Select the trump color before saving."); return; }
       if (capturedRaw === "") { alert("Enter points captured before saving."); return; }
 
       let bid = Number(bidRaw) || 0;
       if (bid > 100) { alert("A bid can't be more than 100 — the whole hand is only worth 100 points."); return; }
       if (bid < 1) { alert("Enter a valid bid amount."); return; }
 
-      const bidderPlayerId = document.getElementById("rookBidder").value;
-      const trump = document.getElementById("rookTrump").value;
       const rawCaptured = Number(capturedRaw) || 0;
       const capturedByBidder = Math.max(0, Math.min(100, rawCaptured));
 
