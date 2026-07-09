@@ -289,10 +289,15 @@ var Screens = {
           <div class="segmented" style="margin-bottom:10px;">
             <button class="${s.endType === "target" ? "on" : ""}" onclick="Setup.setEndType('target')">Target score</button>
             <button class="${s.endType === "hands" ? "on" : ""}" onclick="Setup.setEndType('hands')">Fixed hands</button>
+            <button class="${s.endType === "manual" ? "on" : ""}" onclick="Setup.setEndType('manual')">End on cue</button>
           </div>
         ` : ``}
-        <p class="hint-text" style="margin-bottom:8px;">${s.endType === "target" ? "First to reach this score wins." : "Play exactly this many hands, then the best total wins."}</p>
-        <input class="num-input" type="number" value="${s.endValue}" oninput="Setup.updateEndValue(this.value)" />
+        ${s.endType === "manual" ? `
+          <p class="hint-text">No target score or hand limit — just tap "End Game Now" whenever you're ready to stop.</p>
+        ` : `
+          <p class="hint-text" style="margin-bottom:8px;">${s.endType === "target" ? "First to reach this score wins." : "Play exactly this many hands, then the best total wins."}</p>
+          <input class="num-input" type="number" value="${s.endValue}" oninput="Setup.updateEndValue(this.value)" />
+        `}
       </div>` : ``}
 
       ${s.gameKey === "custom" ? `
@@ -343,7 +348,7 @@ var Screens = {
       <div class="section-label">Running Scoreboard</div>
       ${Play.scoreboard(game)}
 
-      <button class="btn-outline-dark" style="margin-top:14px;" ${game.hands.length === 0 ? "disabled" : ""} onclick="Play.undoLastHand()">Undo Last Hand</button>
+      <button class="btn-outline-light" style="margin-top:14px;" ${game.hands.length === 0 ? "disabled" : ""} onclick="Play.undoLastHand()">Undo Last Hand</button>
       <button class="btn-secondary danger" style="margin-top:10px;" onclick="Play.confirmEnd()">End Game Now</button>
     `;
   },
@@ -373,7 +378,7 @@ var Screens = {
         </table>
       </div>
       <button class="btn-primary" style="margin-top:18px;" onclick="Play.rematch()">Play Again (Same Players)</button>
-      <button class="btn-outline-dark" style="margin-top:10px;" onclick="App.go('home')">Back to Home</button>
+      <button class="btn-outline-light" style="margin-top:10px;" onclick="App.go('home')">Back to Home</button>
     `;
   },
 
@@ -524,7 +529,7 @@ var Screens = {
           </div>
         `).join("")}
       </div>
-      <button class="btn-outline-dark" style="margin-top:14px;" ${isCustom ? "" : "disabled"} onclick="GameOrder.resetToAlphabetical()">Reset to Alphabetical</button>
+      <button class="btn-outline-light" style="margin-top:14px;" ${isCustom ? "" : "disabled"} onclick="GameOrder.resetToAlphabetical()">Reset to Alphabetical</button>
     `;
   },
 

@@ -227,6 +227,8 @@ var Setup = {
       label = gr.label;
       if (s.endType === "target" || s.endType === "hands") {
         endCondition = { type: s.endType, value: s.endValue };
+      } else if (s.endType === "manual") {
+        endCondition = { type: "manual" };
       } else {
         endCondition = { type: gr.endCondition.type, value: gr.endCondition.value };
       }

@@ -220,4 +220,9 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 .modal p{ margin-bottom:14px; }
 .btn-outline-dark{ width:100%; background:transparent; color:var(--felt-dark); border:1.5px solid rgba(30,75,61,.45); border-radius:12px; padding:13px; font-family:'Nunito Sans',sans-serif; font-size:14.5px; font-weight:700; cursor:pointer; }
 .btn-outline-dark:disabled{ opacity:.4; cursor:not-allowed; }
+/* Same shape as btn-outline-dark, but for buttons that sit directly on the
+   felt-green page background instead of inside a cream card/modal — btn-outline-dark's
+   dark-green-on-dark-green is invisible there. */
+.btn-outline-light{ width:100%; background:transparent; color:var(--cream); border:1.5px solid rgba(246,241,228,.45); border-radius:12px; padding:13px; font-family:'Nunito Sans',sans-serif; font-size:14.5px; font-weight:700; cursor:pointer; }
+.btn-outline-light:disabled{ opacity:.4; cursor:not-allowed; }
 
