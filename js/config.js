@@ -51,11 +51,12 @@ var DEFAULT_RULES = {
     winMode: "low",
     teamMode: "none",
     entryType: "simple",
-    endCondition: { type: "hands", value: 3 },
+    endCondition: { type: "hands", value: 3, allowChoice: true },
     info: [
       "A Golf-style card layout game played over 3 rounds.",
       "Positive cards score their face value toward your row/column total — unless a full row or column is three-of-a-kind, in which case it's subtracted instead.",
-      "Lowest cumulative total after all rounds wins."
+      "Lowest cumulative total after all rounds wins.",
+      "Default is 3 rounds, but you can switch to a longer fixed round count or an open-ended \"End on Cue\" game at setup if your family wants to keep going."
     ]
   },
 
@@ -99,12 +100,13 @@ var DEFAULT_RULES = {
     winMode: "high",
     teamMode: "none",
     entryType: "simple",
-    endCondition: { type: "hands", value: 5 },
+    endCondition: { type: "hands", value: 5, allowChoice: true },
     info: [
       "A hand-shedding \"climbing\" game — players race to empty their hand by playing patterns (singles, sets, or runs) in ascending rank.",
       "5 fixed rounds. Each round, whoever empties their hand first scores 3 points, next-fewest cards scores 2, third-fewest scores 1 — everyone else scores 0 that round.",
       "Ties for 2nd: all tied players get 2 points and no 3rd place is awarded. Ties for 3rd: all tied players get 1 point.",
-      "Highest cumulative score after all 5 rounds wins."
+      "Highest cumulative score after all 5 rounds wins.",
+      "Default is 5 rounds, but you can switch to a longer fixed round count, a target score, or an open-ended \"End on Cue\" game at setup if your family wants to keep going."
     ]
   },
 
@@ -113,13 +115,14 @@ var DEFAULT_RULES = {
     winMode: "high",
     teamMode: "none",
     entryType: "simple",
-    endCondition: { type: "hands", value: 5 },
+    endCondition: { type: "hands", value: 5, allowChoice: true },
     info: [
       "A card-shedding game — discard down toward the lowest hand value, or declare \"Countdown\" if you think you already have it.",
       "5 fixed rounds. Each round, lowest hand value scores 3 points, second-lowest scores 2, third-lowest scores 1 — everyone else scores 0.",
       "If you declared \"Countdown\" and truly had the lowest hand, add a +1 bonus (4 points that round). Declare it and you're wrong, and you score 0 instead of 3.",
       "Highest cumulative score after 5 rounds wins.",
-      "The official rules break ties with one extra round among just the tied players — the app doesn't automate that part, so if it comes up, just play one more hand and compare manually."
+      "The official rules break ties with one extra round among just the tied players — the app doesn't automate that part, so if it comes up, just play one more hand and compare manually.",
+      "Default is 5 rounds, but you can switch to a longer fixed round count, a target score, or an open-ended \"End on Cue\" game at setup if your family wants to keep going."
     ]
   },
 
@@ -128,7 +131,7 @@ var DEFAULT_RULES = {
     winMode: "high",
     teamMode: "none",
     entryType: "skullking",
-    endCondition: { type: "hands", value: 10 },
+    endCondition: { type: "hands", value: 10, allowChoice: true },
     scoring: {
       perTrickMade: 20,          // points per trick if your bid is exact
       perTrickMissedPenalty: 10, // points lost per trick you're off by, when bid isn't 0
@@ -141,7 +144,8 @@ var DEFAULT_RULES = {
       "Bid zero and take zero tricks: score 10 points × the round number. Bid zero and take any tricks at all: lose 10 points × the round number instead.",
       "Bonus points — only earned if your bid was exactly right: +10 for each standard-suit 14 you capture (+20 for the black trump 14), +20 for a Pirate capturing a Mermaid, +30 for the Skull King capturing a Pirate, +40 for a Mermaid capturing the Skull King.",
       "Highest total after 10 rounds wins. Official rules break ties with one extra round — same manual workaround as 3-2-1 Countdown if that comes up.",
-      "Point values above are editable in House Rules if you ever switch to the \"Rascal Scoring\" alternate method from the box."
+      "Point values above are editable in House Rules if you ever switch to the \"Rascal Scoring\" alternate method from the box.",
+      "Default is 10 rounds, but you can switch to a different fixed round count, a target score, or an open-ended \"End on Cue\" game at setup if your family wants to keep going."
     ]
   },
 
@@ -150,7 +154,7 @@ var DEFAULT_RULES = {
     winMode: "high",
     teamMode: "none",
     entryType: "whoacowboy",
-    endCondition: { type: "hands", value: 3 },
+    endCondition: { type: "hands", value: 3, allowChoice: true },
     info: [
       "A bluffing game — announce a card (like \"two 3's\"), then either play truthfully or bluff. Numbers must climb (or later descend) each turn; call \"Whoa There Cowboy!\" if you suspect someone's lying.",
       "Catch a real bluff: the bluffer takes back their cards plus a penalty card from the draw pile, and you earn a 10-point token. Wrongly accuse a truthful player: you owe them a card from your own hand.",

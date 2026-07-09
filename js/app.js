@@ -20,6 +20,34 @@ var App = {
     this.state.game = Storage.getActiveGame();
     const settings = Storage.getSettings();
     this.showFirstRunBanner = !settings.helpSeen;
+    if (window.history && window.history.replaceState) {
+      history.replaceState(this._historySnapshot(), "");
+    }
+    window.addEventListener("popstate", (e) => this._onPopState(e));
+    this.render();
+  },
+
+  // Every screen change gets its own history entry, so the device/browser
+  // back button steps backward through in-app screens instead of the app
+  // just closing outright (which is what happens with an empty history
+  // stack in a standalone-mode PWA).
+  _historySnapshot() {
+    return {
+      screen: this.state.screen,
+      rulesViewKey: this.state.rulesViewKey,
+      historyDetailId: this.state.historyDetailId
+    };
+  },
+
+  _onPopState(e) {
+    // A lingering modal shouldn't survive a back navigation underneath it.
+    const overlay = document.querySelector(".modal-overlay");
+    if (overlay) overlay.remove();
+    const s = e.state || { screen: "home", rulesViewKey: null, historyDetailId: null };
+    this.state.screen = s.screen || "home";
+    this.state.rulesViewKey = s.rulesViewKey;
+    this.state.historyDetailId = s.historyDetailId;
+    window.scrollTo(0, 0);
     this.render();
   },
 
@@ -27,6 +55,9 @@ var App = {
     this.state.screen = screen;
     if (extra) Object.assign(this.state, extra);
     window.scrollTo(0, 0);
+    if (window.history && window.history.pushState) {
+      history.pushState(this._historySnapshot(), "");
+    }
     this.render();
   },
 
@@ -287,7 +318,7 @@ var Screens = {
         <h3>How should this game end?</h3>
         ${gameRules.endCondition.allowChoice ? `
           <div class="segmented" style="margin-bottom:10px;">
-            <button class="${s.endType === "target" ? "on" : ""}" onclick="Setup.setEndType('target')">Target score</button>
+            ${gameRules.winMode === "high" ? `<button class="${s.endType === "target" ? "on" : ""}" onclick="Setup.setEndType('target')">Target score</button>` : ``}
             <button class="${s.endType === "hands" ? "on" : ""}" onclick="Setup.setEndType('hands')">Fixed hands</button>
             <button class="${s.endType === "manual" ? "on" : ""}" onclick="Setup.setEndType('manual')">End on cue</button>
           </div>
@@ -422,6 +453,7 @@ var Screens = {
         </table>
       </div>
       <p class="hint-text" style="margin-top:12px;">${entry.hands.length} hand${entry.hands.length === 1 ? "" : "s"} played &middot; ${formatUSDateTime(entry.finishedAt)}</p>
+      <button class="tiny-link danger" style="display:block;text-align:center;margin-top:16px;" onclick="Play.deleteHistoryEntry('${entry.id}')">Delete this entry</button>
     `;
   },
 

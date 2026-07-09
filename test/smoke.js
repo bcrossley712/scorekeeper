@@ -11,9 +11,9 @@ const dom = new JSDOM(`<!DOCTYPE html><html><body><div id="app"></div></body></h
 global.window = dom.window;
 global.document = dom.window.document;
 global.localStorage = dom.window.localStorage;
-dom.window.confirm = () => true;
-dom.window.alert = (msg) => console.log("ALERT:", msg);
-dom.window.prompt = () => "Guest Gary";
+// Native confirm/alert/prompt are no longer used anywhere in the app — every
+// call site now goes through the themed UI.confirm/prompt/alert modals in
+// js/ui.js, which the helpers below drive directly.
 
 function load(file) {
   const code = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
@@ -23,14 +23,37 @@ function load(file) {
 load("js/config.js");
 load("js/storage.js");
 load("js/engine.js");
+load("js/ui.js");
 load("js/controllers.js");
 load("js/app.js");
 
-const { App, Storage, Players, Setup, Play, RulesEdit, Screens, Engine, DEFAULT_RULES, GameOrder, GAME_ORDER } = dom.window;
+const { App, Storage, Players, Setup, Play, RulesEdit, Screens, Engine, UI, DEFAULT_RULES, GameOrder, GAME_ORDER } = dom.window;
 
 function assert(cond, msg) {
   if (!cond) throw new Error("FAIL: " + msg);
   console.log("OK: " + msg);
+}
+
+// Clicks the confirm button on an open UI.confirm modal (throws if none is open).
+function clickModalConfirm() {
+  const btn = document.getElementById("uiConfirmYes");
+  if (!btn) throw new Error("expected a confirm modal to be open");
+  btn.click();
+}
+
+// Clicks cancel on an open UI.confirm modal.
+function cancelModalConfirm() {
+  const btn = document.getElementById("uiConfirmNo");
+  if (!btn) throw new Error("expected a confirm modal to be open");
+  btn.click();
+}
+
+// Fills and submits an open UI.prompt modal (throws if none is open).
+function submitModalPrompt(value) {
+  const input = document.getElementById("uiPromptInput");
+  if (!input) throw new Error("expected a prompt modal to be open");
+  input.value = value;
+  document.getElementById("uiPromptOk").click();
 }
 
 // 1. Init app cold
@@ -197,6 +220,7 @@ App.state.rulesViewKey = "handfoot";
 RulesEdit.startEdit("handfoot");
 RulesEdit.setNested("bonuses", "cleanBook", "999");
 RulesEdit.save();
+clickModalConfirm();
 const newRules = Storage.getRules();
 console.log("DEBUG cleanBook after edit:", newRules.handfoot.bonuses.cleanBook, "rulesViewKey:", App.state.rulesViewKey, "buffer:", RulesEdit.buffer);
 assert(newRules.handfoot.bonuses.cleanBook === 999, "house rule edit persisted");
@@ -264,6 +288,7 @@ assert(JSON.stringify(Storage.getPlayers()) === statsBefore, "abandoning a game 
 Players.setColor(players[0].id, "#4A6FA5");
 assert(Storage.getPlayers().find(p => p.id === players[0].id).color === "#4A6FA5", "player color can be set");
 Players.resetStats(players[0].id);
+clickModalConfirm();
 const resetPlayer = Storage.getPlayers().find(p => p.id === players[0].id);
 assert(resetPlayer.wins === 0 && resetPlayer.gamesPlayed === 0, "player stats reset to zero");
 
@@ -282,6 +307,7 @@ fillSimple([10, 20]); // hand 1
 fillSimple([5, 8]);   // hand 2
 assert(App.state.game.hands.length === 2, "gnoming has 2 hands before undo");
 Play.undoLastHand();
+clickModalConfirm();
 assert(App.state.game.hands.length === 1, "undo removes exactly the last hand");
 let totalsAfterUndo = Engine.runningTotals(App.state.game);
 assert(totalsAfterUndo[game.units[0].id] === 10 && totalsAfterUndo[game.units[1].id] === 20, "totals reflect only the remaining hand after undo");
@@ -314,6 +340,7 @@ document.getElementById("rookCapturedBid").value = "20";
 Play.saveRook();
 assert(App.state.game.lastRookInfo.biddingPlayerName === "Katie", "lastRookInfo reflects hand 2 before undo");
 Play.undoLastHand();
+clickModalConfirm();
 assert(App.state.game.hands.length === 1, "rook undo removes exactly the last hand");
 assert(App.state.game.lastRookInfo.biddingPlayerName === "Brandon", "undo correctly restores the previous hand's bid info");
 assert(App.state.game.lastRookInfo.made === true, "restored bid info correctly shows hand 1 was made");
@@ -461,6 +488,7 @@ App.state.rulesViewKey = "skullking";
 RulesEdit.startEdit("skullking");
 RulesEdit.setNested("scoring", "perTrickMade", "10");
 RulesEdit.save();
+clickModalConfirm();
 assert(Storage.getRules().skullking.scoring.perTrickMade === 10, "Skull King scoring constants are editable via House Rules");
 
 // 23. Whoa There Cowboy — token-based scoring, fixed 3 rounds by default
@@ -482,12 +510,24 @@ assert(wtcTotals[game.units[0].id] === 37, "Whoa There Cowboy: 40 token points -
 assert(wtcTotals[game.units[1].id] === -5, "Whoa There Cowboy: no tokens, 5 cards left = -5");
 Play.abandonGame();
 
-// 24. Newly-added target/hands choice works for the other score-accumulating games too
+// 24. "End on cue" (and the other end-condition choices) rolled out to every game whose
+// ending is just a round/score counter, not a real structural rule like Phase 10's.
+["gnoming", "dragoness", "countdown321", "skullking", "whoacowboy"].forEach(key => {
+  assert(DEFAULT_RULES[key].endCondition.allowChoice === true, `${key} now allows choosing how the game ends`);
+});
+assert(!DEFAULT_RULES.phase10.endCondition.allowChoice, "Phase 10 is correctly left out — its ending is a real rule (someone finishes Phase 10), not a stand-in round count");
+assert(DEFAULT_RULES.sequence.endCondition.type === "manual" && !DEFAULT_RULES.sequence.endCondition.allowChoice, "Sequence stays manual-only (win/loss tracker, no round/score concept to choose between)");
+assert(DEFAULT_RULES.backwards8.endCondition.type === "manual" && !DEFAULT_RULES.backwards8.endCondition.allowChoice, "Backwards 8 stays manual-only, same reason as Sequence");
+
 Setup.pick("gnoming");
 assert(App.state.setup.endType === "hands", "Gnoming A Round defaults to fixed hands");
-Setup.setEndType("target");
-assert(App.state.setup.endType === "target", "Gnoming A Round can now be switched to target score");
-Setup.setEndType("hands"); // switch back so nothing downstream is affected
+let setupHtml = Screens.setup();
+assert(!setupHtml.includes(">Target score<"), "Gnoming's setup screen hides Target Score — it's a low-score-wins game, so \"first to reach X\" doesn't apply");
+assert(setupHtml.includes(">Fixed hands<") && setupHtml.includes(">End on cue<"), "Gnoming's setup screen still offers Fixed hands and End on cue");
+
+Setup.pick("whoacowboy");
+setupHtml = Screens.setup();
+assert(setupHtml.includes(">Target score<") && setupHtml.includes(">Fixed hands<") && setupHtml.includes(">End on cue<"), "Whoa There Cowboy (high-score-wins) offers all three end-condition choices");
 
 // 25. "End on cue" (manual) now works as a real third choice for preset games too, not just Custom
 Setup.pick("dragoness");
@@ -506,5 +546,130 @@ fillSimple([5, 2]);
 fillSimple([5, 2]); // 6 hands played — well past the game's normal 5-round default
 assert(App.state.screen === "play", "manual end-condition never auto-ends, no matter how many hands are played");
 Play.abandonGame();
+
+// 25b. Whoa There Cowboy (a game explicitly called out as fine to keep going past its
+// suggested length) can now also be set to fixed hands beyond its default of 3, or manual
+Setup.pick("whoacowboy");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.setEndType("hands");
+Setup.updateEndValue(6);
+Setup.start();
+game = App.state.game;
+assert(game.endCondition.type === "hands" && game.endCondition.value === 6, "Whoa There Cowboy's fixed-hands length is no longer stuck at the suggested default of 3");
+App.render();
+for (let i = 0; i < 6; i++) {
+  const blocks = document.querySelectorAll(".entry-unit-block");
+  blocks.forEach((b) => {
+    b.querySelector(".wtc-tokens").value = "10";
+    b.querySelector(".wtc-left").value = "0";
+  });
+  if (App.state.screen !== "play") break;
+  Play.saveWhoaCowboy();
+  if (i < 5) App.render();
+}
+assert(App.state.screen === "results", "Whoa There Cowboy correctly auto-ends at the new, longer fixed-hands count (6), not the old default of 3");
+
+// 26. Duplicate player name guard: adding a second "Brandon" opens a themed
+// confirm modal instead of silently creating an indistinguishable duplicate.
+document.body.innerHTML = '<div id="app"></div><input id="newPlayerName" value="Brandon">';
+Players.add();
+assert(document.getElementById("uiConfirmYes") !== null, "adding a duplicate name opens a themed confirm modal");
+assert(Storage.getPlayers().length === 4, "the duplicate isn't added until the modal is confirmed");
+cancelModalConfirm();
+assert(Storage.getPlayers().length === 4, "cancelling the duplicate-name modal adds no one");
+document.body.innerHTML = '<div id="app"></div><input id="newPlayerName" value="Brandon">';
+Players.add();
+clickModalConfirm();
+assert(Storage.getPlayers().length === 5, "confirming the duplicate-name modal does add the second Brandon");
+
+// 27. Players.remove opens a themed confirm modal; cancel keeps the player, confirm removes them
+const dupBrandon = Storage.getPlayers().find(p => p.name === "Brandon" && p.id !== players[0].id);
+Players.remove(dupBrandon.id);
+cancelModalConfirm();
+assert(Storage.getPlayers().some(p => p.id === dupBrandon.id), "cancelling remove keeps the player");
+Players.remove(dupBrandon.id);
+clickModalConfirm();
+assert(!Storage.getPlayers().some(p => p.id === dupBrandon.id), "confirming remove deletes the player");
+assert(Storage.getPlayers().length === 4, "roster back to 4 after removing the duplicate");
+
+// 28. Setup.addGuest uses a themed prompt modal instead of the native one
+Setup.pick("gnoming");
+Setup.addGuest();
+assert(document.getElementById("uiPromptInput") !== null, "addGuest opens a themed prompt modal");
+submitModalPrompt("Guest Gary");
+assert(App.state.setup.guestPlayers.some(g => g.name === "Guest Gary"), "guest added via the prompt modal");
+assert(App.state.setup.selectedPlayerIds.includes(App.state.setup.guestPlayers[0].id), "guest is auto-selected for this game");
+
+// 29. Deleting an arbitrary (non-last) hand, not just the most recent one
+Setup.pick("gnoming");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.setEndType("manual"); // gnoming defaults to a fixed 3 hands, which would auto-end the game right as we finish entering hand 3
+Setup.start();
+game = App.state.game;
+fillSimple([10, 1]); // hand 1
+fillSimple([20, 2]); // hand 2
+fillSimple([30, 3]); // hand 3
+assert(App.state.game.hands.length === 3, "3 hands played before deleting one");
+Play.deleteHand(2); // delete the middle hand, not the last
+clickModalConfirm();
+assert(App.state.game.hands.length === 2, "deleteHand removes exactly one hand");
+assert(App.state.game.hands[0].handNum === 1 && App.state.game.hands[1].handNum === 2, "remaining hands are renumbered contiguously");
+const totalsAfterDelete = Engine.runningTotals(App.state.game);
+assert(totalsAfterDelete[game.units[0].id] === 40, "totals reflect only the remaining hands (10 + 30, hand 2 removed)");
+assert(totalsAfterDelete[game.units[1].id] === 4, "totals reflect only the remaining hands (1 + 3, hand 2 removed)");
+Play.abandonGame();
+
+// 30. Deleting a finished game from history
+Setup.pick("gnoming");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+fillSimple([10, 20]);
+fillSimple([5, 8]);
+fillSimple([1, 2]); // 3rd hand auto-ends gnoming
+assert(App.state.screen === "results", "game finished, ready to be deleted from history");
+const historyCountBeforeDelete = Storage.getHistory().length;
+const deletableId = Storage.getHistory()[0].id; // newest entry (unshift puts newest first)
+Play.deleteHistoryEntry(deletableId);
+clickModalConfirm();
+assert(Storage.getHistory().length === historyCountBeforeDelete - 1, "deleting a history entry removes exactly one");
+assert(!Storage.getHistory().some(e => e.id === deletableId), "the deleted entry is actually gone");
+
+// 31. Back-button plumbing: each screen change pushes a history entry, and a
+// popstate event restores the previous screen instead of exiting the app.
+// (A real device back button is simulated by directly dispatching the same
+// popstate event our listener handles, since jsdom's own history.back() is
+// asynchronous and this suite runs synchronously top-to-bottom.)
+App.go("home");
+assert(window.history.state && window.history.state.screen === "home", "navigating pushes a history entry with the current screen");
+App.go("picker");
+assert(window.history.state.screen === "picker", "picker screen pushed its own history entry");
+App.go("players");
+assert(window.history.state.screen === "players", "players screen pushed its own history entry");
+window.dispatchEvent(new window.PopStateEvent("popstate", { state: { screen: "picker", rulesViewKey: null, historyDetailId: null } }));
+assert(App.state.screen === "picker", "a popstate event navigates back to the previous screen instead of exiting the app");
+
+App.go("home");
+UI.confirm("test", () => {});
+assert(document.querySelector(".modal-overlay") !== null, "modal is open before the back navigation");
+window.dispatchEvent(new window.PopStateEvent("popstate", { state: { screen: "home", rulesViewKey: null, historyDetailId: null } }));
+assert(document.querySelector(".modal-overlay") === null, "popstate cleans up any lingering modal");
+
+// 32. UI.alert (available for future use even though nothing calls it yet)
+UI.alert("Test alert message");
+assert(document.getElementById("uiAlertOk") !== null, "UI.alert opens a themed alert modal");
+document.getElementById("uiAlertOk").click();
+assert(document.querySelector(".modal-overlay") === null, "UI.alert modal dismisses on OK");
+
+// 33. Update-available banner (the real trigger is a service worker
+// controllerchange event, wired up in index.html — that part isn't
+// exercised here, just the DOM behavior of the banner itself)
+UI.showUpdateBanner();
+assert(document.getElementById("updateBanner") !== null, "showUpdateBanner injects the banner");
+UI.showUpdateBanner();
+assert(document.querySelectorAll("#updateBanner").length === 1, "calling showUpdateBanner again doesn't duplicate it");
+document.getElementById("updateBanner").remove();
 
 console.log("\\nALL SMOKE TESTS PASSED");

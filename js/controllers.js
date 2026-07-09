@@ -56,17 +56,27 @@ var Players = {
     const name = (input.value || "").trim();
     if (!name) return;
     const players = Storage.getPlayers();
-    const color = PLAYER_COLORS[players.length % PLAYER_COLORS.length];
-    players.push({ id: Storage.uid(), name, wins: 0, gamesPlayed: 0, color });
-    Storage.savePlayers(players);
-    input.value = "";
-    App.render();
+    const finish = () => {
+      const color = PLAYER_COLORS[players.length % PLAYER_COLORS.length];
+      players.push({ id: Storage.uid(), name, wins: 0, gamesPlayed: 0, color });
+      Storage.savePlayers(players);
+      input.value = "";
+      App.render();
+    };
+    const isDup = players.some(p => p.name.toLowerCase() === name.toLowerCase());
+    if (isDup) {
+      UI.confirm(`There's already a player named "${escapeHtml(name)}." Add another with the same name?`, finish,
+        { title: "Duplicate name", confirmLabel: "Add Anyway" });
+    } else {
+      finish();
+    }
   },
   remove(id) {
-    if (!confirm("Remove this player? Their past game history stays, but they'll need to be re-added to play again.")) return;
-    const players = Storage.getPlayers().filter(p => p.id !== id);
-    Storage.savePlayers(players);
-    App.render();
+    UI.confirm("Remove this player? Their past game history stays, but they'll need to be re-added to play again.", () => {
+      const players = Storage.getPlayers().filter(p => p.id !== id);
+      Storage.savePlayers(players);
+      App.render();
+    }, { title: "Remove this player?", confirmLabel: "Remove" });
   },
   toggleColorPicker(id) {
     this.openColorId = this.openColorId === id ? null : id;
@@ -80,12 +90,13 @@ var Players = {
     App.render();
   },
   resetStats(id) {
-    if (!confirm("Reset this player's wins and games-played count back to zero? This doesn't touch past game history.")) return;
-    const players = Storage.getPlayers();
-    const p = players.find(pp => pp.id === id);
-    if (p) { p.wins = 0; p.gamesPlayed = 0; }
-    Storage.savePlayers(players);
-    App.render();
+    UI.confirm("Reset this player's wins and games-played count back to zero? This doesn't touch past game history.", () => {
+      const players = Storage.getPlayers();
+      const p = players.find(pp => pp.id === id);
+      if (p) { p.wins = 0; p.gamesPlayed = 0; }
+      Storage.savePlayers(players);
+      App.render();
+    }, { title: "Reset stats?", confirmLabel: "Reset" });
   }
 };
 
@@ -129,13 +140,14 @@ var Setup = {
   },
 
   addGuest() {
-    const name = prompt("Guest's name?");
-    if (!name || !name.trim()) return;
-    const s = App.state.setup;
-    const id = "guest_" + Storage.uid();
-    s.guestPlayers.push({ id, name: name.trim() });
-    s.selectedPlayerIds.push(id);
-    App.render();
+    UI.prompt("What's the guest's name?", (name) => {
+      if (!name || !name.trim()) return;
+      const s = App.state.setup;
+      const id = "guest_" + Storage.uid();
+      s.guestPlayers.push({ id, name: name.trim() });
+      s.selectedPlayerIds.push(id);
+      App.render();
+    }, { title: "Add a guest", placeholder: "Guest's name", okLabel: "Add Guest" });
   },
 
   guestById(id) {
@@ -209,7 +221,7 @@ var Setup = {
   },
 
   start() {
-    if (this.validationMessage()) { alert(this.validationMessage()); return; }
+    if (this.validationMessage()) return;
     const s = App.state.setup;
     const units = this.buildUnits(s);
     let rulesSnapshot, winMode, endCondition, label;
@@ -768,7 +780,10 @@ var Play = {
       <div class="hand-history">
         ${game.hands.slice().reverse().map(h => `
           <div class="hand-row">
-            <div class="hand-row-title">Hand ${h.handNum}</div>
+            <div class="hand-row-top">
+              <div class="hand-row-title">Hand ${h.handNum}</div>
+              <button class="icon-btn danger" onclick="Play.deleteHand(${h.handNum})" title="Remove this hand">&times;</button>
+            </div>
             <div class="hand-row-scores">
               ${game.units.map(u => `<span class="hand-score-chip">${escapeHtml(u.name.split(" (")[0])}: ${h.entries[u.id] ? h.entries[u.id].score : 0}</span>`).join("")}
             </div>
@@ -802,32 +817,50 @@ var Play = {
     App.go("play");
   },
 
+  recomputeLastRookInfo(game) {
+    const prevHand = game.hands[game.hands.length - 1];
+    if (prevHand && prevHand.handMeta && prevHand.handMeta.biddingTeamId) {
+      const meta = prevHand.handMeta;
+      const bidderUnit = game.units.find(u => u.id === meta.biddingTeamId);
+      const bidderEntry = prevHand.entries[meta.biddingTeamId];
+      game.lastRookInfo = {
+        biddingPlayerName: meta.biddingPlayerName || "Bidder",
+        biddingTeamName: bidderUnit ? bidderUnit.name : "—",
+        bid: meta.bid,
+        trump: meta.trump,
+        made: bidderEntry ? bidderEntry.score >= 0 : true
+      };
+    } else {
+      game.lastRookInfo = null; // previous hand was manual, or no hands left — nothing to show
+    }
+  },
+
   undoLastHand() {
     const game = App.state.game;
     if (!game || game.hands.length === 0) return;
-    if (!confirm("Remove the last hand? You'll need to re-enter it.")) return;
-    game.hands.pop();
+    UI.confirm("Remove the last hand? You'll need to re-enter it.", () => {
+      game.hands.pop();
+      if (game.gameKey === "rook") this.recomputeLastRookInfo(game);
+      Storage.saveActiveGame(game);
+      App.render();
+    }, { title: "Remove this hand?", confirmLabel: "Remove Hand" });
+  },
 
-    if (game.gameKey === "rook") {
-      const prevHand = game.hands[game.hands.length - 1];
-      if (prevHand && prevHand.handMeta && prevHand.handMeta.biddingTeamId) {
-        const meta = prevHand.handMeta;
-        const bidderUnit = game.units.find(u => u.id === meta.biddingTeamId);
-        const bidderEntry = prevHand.entries[meta.biddingTeamId];
-        game.lastRookInfo = {
-          biddingPlayerName: meta.biddingPlayerName || "Bidder",
-          biddingTeamName: bidderUnit ? bidderUnit.name : "—",
-          bid: meta.bid,
-          trump: meta.trump,
-          made: bidderEntry ? bidderEntry.score >= 0 : true
-        };
-      } else {
-        game.lastRookInfo = null; // previous hand was manual, or no hands left — nothing to show
-      }
-    }
-
-    Storage.saveActiveGame(game);
-    App.render();
+  // Removes any hand (not just the most recent) — for fixing a typo a few
+  // hands back without losing everything played since. Renumbers what's
+  // left so the display stays contiguous (Hand 1, 2, 3...).
+  deleteHand(handNum) {
+    const game = App.state.game;
+    if (!game) return;
+    UI.confirm(`Remove Hand ${handNum}? You'll need to re-enter it if that wasn't the intent.`, () => {
+      const idx = game.hands.findIndex(h => h.handNum === handNum);
+      if (idx === -1) return;
+      game.hands.splice(idx, 1);
+      game.hands.forEach((h, i) => { h.handNum = i + 1; });
+      if (game.gameKey === "rook") this.recomputeLastRookInfo(game);
+      Storage.saveActiveGame(game);
+      App.render();
+    }, { title: "Remove this hand?", confirmLabel: "Remove Hand" });
   },
 
   confirmEnd() {
@@ -902,6 +935,13 @@ var Play = {
     App.state.lastFinishedGame = { ...game, standings };
     App.state.entryDraft = {};
     App.go("results");
+  },
+
+  deleteHistoryEntry(id) {
+    UI.confirm("Delete this game from history? This can't be undone.", () => {
+      Storage.deleteHistoryEntry(id);
+      App.go("history");
+    }, { title: "Delete this entry?", confirmLabel: "Delete" });
   }
 };
 
@@ -917,11 +957,12 @@ var RulesEdit = {
     this.buffer.endCondition.value = Number(val) || 0;
   },
   save() {
-    if (!confirm(`This changes scoring for all future ${this.buffer.label} games. Games already in progress keep their original rules. Continue?`)) return;
-    const rules = Storage.getRules();
-    rules[App.state.rulesViewKey] = this.buffer;
-    Storage.saveRules(rules);
-    this.buffer = null;
-    App.go("rules");
+    UI.confirm(`This changes scoring for all future ${this.buffer.label} games. Games already in progress keep their original rules. Continue?`, () => {
+      const rules = Storage.getRules();
+      rules[App.state.rulesViewKey] = this.buffer;
+      Storage.saveRules(rules);
+      this.buffer = null;
+      App.go("rules");
+    }, { title: "Save house rules?", confirmLabel: "Save Changes" });
   }
 };

@@ -115,8 +115,10 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 
 .hand-history{ margin-top:10px; }
 .hand-row{ background:var(--cream); border-radius:10px; padding:10px 12px; margin-bottom:8px; box-shadow:0 4px 14px rgba(0,0,0,.18); }
+.hand-row-top{ display:flex; align-items:center; justify-content:space-between; }
+.hand-row-top .hand-row-title{ margin-bottom:0; }
 .hand-row-title{ font-family:'Fraunces',serif; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:#8a7f70; margin-bottom:6px; }
-.hand-row-scores{ display:flex; flex-wrap:wrap; gap:6px; }
+.hand-row-scores{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
 .hand-score-chip{ background:var(--cream-dim); border-radius:8px; padding:4px 9px; font-size:12.5px; font-weight:700; color:var(--ink); white-space:nowrap; }
 
 .num-input, .text-input{ width:100%; padding:14px; font-size:18px; font-family:'Fraunces',serif; border:2px solid rgba(42,38,34,.15); border-radius:10px; text-align:center; font-weight:600; color:var(--ink); background:white; }
@@ -225,4 +227,7 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
    dark-green-on-dark-green is invisible there. */
 .btn-outline-light{ width:100%; background:transparent; color:var(--cream); border:1.5px solid rgba(246,241,228,.45); border-radius:12px; padding:13px; font-family:'Nunito Sans',sans-serif; font-size:14.5px; font-weight:700; cursor:pointer; }
 .btn-outline-light:disabled{ opacity:.4; cursor:not-allowed; }
+
+.update-banner{ position:fixed; top:0; left:0; right:0; background:var(--felt-dark); color:var(--cream); padding:10px 16px; display:flex; align-items:center; justify-content:center; gap:14px; font-size:13px; font-weight:700; z-index:200; box-shadow:0 4px 14px rgba(0,0,0,.3); }
+.update-banner button{ background:var(--pip); color:var(--cream); border:none; border-radius:20px; padding:6px 14px; font-weight:800; font-size:12.5px; cursor:pointer; }
 

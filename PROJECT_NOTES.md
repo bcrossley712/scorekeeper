@@ -17,8 +17,10 @@ css/style.css        — all styling (felt-green/cream card-table theme)
 js/config.js         — DEFAULT_RULES: every game's rules as data (labels, scoring, end conditions)
 js/storage.js        — localStorage read/write, including self-healing of stale saved data
 js/engine.js         — pure scoring math functions, one per game entryType
+js/ui.js             — UI.confirm/prompt/alert (themed modal replacements for native browser dialogs)
+                        + UI.showUpdateBanner() for the "new version ready" prompt
 js/controllers.js    — Players/Setup/Play/RulesEdit/GameOrder: all button/input handlers
-js/app.js            — Screens object (renders each screen) + App (state/router)
+js/app.js            — Screens object (renders each screen) + App (state/router, History API back-button wiring)
 manifest.json / sw.js — PWA install + offline caching
 icons/                — home-screen icons (spade glyph, felt green)
 test/smoke.js         — jsdom-based test suite covering every game type end-to-end
@@ -44,15 +46,23 @@ to open cold and trace top-to-bottom.
    finalized, not have them pushed automatically after every small change.
 5. The user deploys via **VS Code's Source Control panel** (Publish to GitHub was used for initial setup)
    and tests locally with `py -m http.server 8000` (their machine only has the `py` launcher, not `python`).
+6. **If you add a new `js/*.js` file, it must go in three places**: the `<script>` tag order in
+   `index.html`, the `ASSETS` array in `sw.js` (or it silently won't be cached offline), and the `load()`
+   calls at the top of `test/smoke.js`. Easy to forget the last two since the app still works fine
+   locally without them — the gap only shows up offline or in a fresh install.
 
 ## Data model essentials
 - A **game** has `units` (players or teams), `hands` (array of rounds played), an `endCondition`
   (`target` / `hands` / `manual` / `phase`), and a `rulesSnapshot` — a **deep copy** of that game's rules
   taken at start time, so editing house rules mid-game-night never affects a game already in progress.
-- **End conditions**: every score-accumulating game now supports all three choices (Target Score / Fixed
-  Hands / End on Cue) via `allowChoice: true` in config. Exceptions on purpose: Phase 10 (ends when
-  someone finishes Phase 10 — a real rule, not a stand-in), and Sequence/Backwards 8 (win/loss trackers,
-  not point-based, so "target score" doesn't apply).
+- **End conditions**: every game whose ending is just a round/score counter (not a real structural rule)
+  now supports all three choices — Target Score / Fixed Hands / End on Cue — via `allowChoice: true` in
+  config: Rook, Hand & Foot, Gnoming A Round, Reign of Dragoness, 3-2-1 Countdown, Skull King, and Whoa
+  There Cowboy. "Target Score" is hidden from the Setup screen for low-score-wins games (currently just
+  Gnoming) since "first to reach X" doesn't mean anything when lower is better — see the `winMode ===
+  "high"` check around the segmented control in `Screens.setup()`. Two real exceptions remain: Phase 10
+  (ends when someone finishes Phase 10 — an actual rule, not a stand-in round count) and Sequence/
+  Backwards 8 (win/loss trackers with no round or score concept to choose between in the first place).
 - **House Rules editing** is deliberately buried (Rules screen → pick game → small "Edit house rules"
   link at the bottom, not a prominent button) so nobody changes scoring by accident mid-game-night.
 
@@ -74,10 +84,16 @@ All games also support a **manual override toggle** ("just type the total instea
 regardless of how structured the entry normally is.
 
 ## Other notable features already built
-- Undo Last Hand (removes + lets you re-enter, rather than a full field-by-field edit)
+- Undo Last Hand (removes + lets you re-enter, rather than a full field-by-field edit) — plus a per-hand
+  delete button on any hand in the running history (`Play.deleteHand()`), not just the most recent one.
+  Both share `Play.recomputeLastRookInfo()` so Rook's "last hand's bid" panel stays correct either way.
 - Play Again / Rematch (same players/teams/rules, skips setup)
 - Abandon Game (end without declaring a winner — no history entry, no stat changes)
-- Player colors, Reset Stats (not delete-and-recreate)
+- Player colors, Reset Stats (not delete-and-recreate). Adding a player with a name that already exists
+  now prompts for confirmation first (`Players.add()`'s duplicate-name guard) rather than silently
+  creating two indistinguishable entries.
+- Delete a single Game History entry (`Play.deleteHistoryEntry()`, button on the History Detail screen) —
+  separate from the declined full export/backup feature below; this is just "undo a mis-recorded game."
 - Reorder Games screen (up/down arrows, no drag-and-drop) — defaults to alphabetical, "Reset to
   Alphabetical" button clears any custom order. New games added later auto-append rather than
   resetting a user's custom order (see `GameOrder.getEffectiveOrder()` in controllers.js).
@@ -85,6 +101,19 @@ regardless of how structured the entry normally is.
   plus a cheeky toast ("Hey, you missed something!" → "Really...? Check the red one." on repeat fails)
 - Rules-healing in `storage.js`: if a user's saved rules predate a config change (new field, new game),
   missing pieces get merged in automatically without touching their customizations.
+- **Themed confirm/prompt/alert modals** (`js/ui.js`) replace every native `confirm()`/`prompt()`/`alert()`
+  call in the app — those broke the felt-and-cream look with a jarring system dialog. `UI.alert()` has no
+  caller yet but is there and tested for whenever one comes up.
+- **Device/browser back button now navigates in-app screens** instead of closing the app outright. Every
+  `App.go()` call pushes a `history` entry (with `screen`/`rulesViewKey`/`historyDetailId`); a `popstate`
+  listener in `App.init()` reads it back on back-navigation. Previously the app never touched the History
+  API at all, so an installed PWA's empty history stack meant the very first back-press exited entirely.
+  A lingering modal is also force-closed on any popstate, so back-then-forward can't strand one on screen.
+- **"Update available" banner**: since `sw.js` already does `skipWaiting()`/`clients.claim()`, a new
+  version takes over in the background the moment it's deployed — but an already-open tab wouldn't know
+  until a manual restart. `index.html` listens for `serviceWorker.controllerchange` and calls
+  `UI.showUpdateBanner()` (skipped on first install, only shown for a genuine update over an existing
+  controller) so people actually see new deploys land.
 
 ## Known open items / possible next steps
 - Whoa There Cowboy and Skull King came from photographed rulebooks — if the user later gets different
@@ -92,8 +121,14 @@ regardless of how structured the entry normally is.
   Whoa There Cowboy's formula is hardcoded in `Engine.whoacowboy()` (simple enough it wasn't made editable).
 - Not yet built (discussed, declined, or deferred): data export/backup (declined — user isn't worried
   about losing stats), family stats/leaderboard screen (declined — feels redundant with existing history).
+- **Deliberate scope decision on hand-fixing**: `Play.deleteHand()` only removes a past hand, it doesn't
+  let you edit one in place. A true in-place editor would need every entryType (rook, skullking, phase10,
+  handfoot, whoacowboy) to store its raw per-field inputs alongside the computed score, plus a dedicated
+  edit form per type — a much bigger, riskier change. Delete-and-re-enter covers the common case (typo a
+  few hands back) without that. Worth revisiting if it turns out to be annoying in practice.
 - User was warned that having two chats/browser tabs edit files "at once" caused at least one real bug
   (Skull King's engine function had a signature mismatch) — stick to one active conversation for edits.
+- Current `sw.js` cache version: `scorekeeper-v24`.
 
 ## If you're a new Claude conversation reading this
 Ask the user to paste or upload the current project files (or just the ones relevant to the task) so you're

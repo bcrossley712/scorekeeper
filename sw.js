@@ -1,4 +1,4 @@
-const CACHE_NAME = "scorekeeper-v22";
+const CACHE_NAME = "scorekeeper-v24";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const ASSETS = [
   "./js/config.js",
   "./js/storage.js",
   "./js/engine.js",
+  "./js/ui.js",
   "./js/controllers.js",
   "./js/app.js",
   "./manifest.json",

@@ -70,6 +70,10 @@ var Storage = {
     h.unshift(entry);
     return this._write(STORAGE_KEYS.history, h);
   },
+  deleteHistoryEntry(id) {
+    const h = this.getHistory().filter(e => e.id !== id);
+    return this._write(STORAGE_KEYS.history, h);
+  },
 
   getActiveGame() { return this._read(STORAGE_KEYS.active, null); },
   saveActiveGame(game) { return this._write(STORAGE_KEYS.active, game); },
