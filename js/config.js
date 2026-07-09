@@ -47,7 +47,7 @@ var DEFAULT_RULES = {
   },
 
   gnoming: {
-    label: "Gnoming Around",
+    label: "Gnoming A Round",
     winMode: "low",
     teamMode: "none",
     entryType: "simple",
@@ -92,12 +92,79 @@ var DEFAULT_RULES = {
       "A marble-race style game (in the spirit of Aggravation), moved around the board with cards instead of dice.",
       "No point ruleset yet — currently tracked as a simple win/loss game. A full ruleset can be added later."
     ]
+  },
+
+  dragoness: {
+    label: "Reign of Dragoness",
+    winMode: "high",
+    teamMode: "none",
+    entryType: "simple",
+    endCondition: { type: "hands", value: 5 },
+    info: [
+      "A hand-shedding \"climbing\" game — players race to empty their hand by playing patterns (singles, sets, or runs) in ascending rank.",
+      "5 fixed rounds. Each round, whoever empties their hand first scores 3 points, next-fewest cards scores 2, third-fewest scores 1 — everyone else scores 0 that round.",
+      "Ties for 2nd: all tied players get 2 points and no 3rd place is awarded. Ties for 3rd: all tied players get 1 point.",
+      "Highest cumulative score after all 5 rounds wins."
+    ]
+  },
+
+  countdown321: {
+    label: "3-2-1 Countdown",
+    winMode: "high",
+    teamMode: "none",
+    entryType: "simple",
+    endCondition: { type: "hands", value: 5 },
+    info: [
+      "A card-shedding game — discard down toward the lowest hand value, or declare \"Countdown\" if you think you already have it.",
+      "5 fixed rounds. Each round, lowest hand value scores 3 points, second-lowest scores 2, third-lowest scores 1 — everyone else scores 0.",
+      "If you declared \"Countdown\" and truly had the lowest hand, add a +1 bonus (4 points that round). Declare it and you're wrong, and you score 0 instead of 3.",
+      "Highest cumulative score after 5 rounds wins.",
+      "The official rules break ties with one extra round among just the tied players — the app doesn't automate that part, so if it comes up, just play one more hand and compare manually."
+    ]
+  },
+
+  skullking: {
+    label: "Skull King",
+    winMode: "high",
+    teamMode: "none",
+    entryType: "skullking",
+    endCondition: { type: "hands", value: 10 },
+    scoring: {
+      perTrickMade: 20,          // points per trick if your bid is exact
+      perTrickMissedPenalty: 10, // points lost per trick you're off by, when bid isn't 0
+      zeroBidRoundMultiplier: 10 // bid 0 and correct = this × round number; bid 0 and wrong = negative of the same
+    },
+    info: [
+      "A trick-taking bidding game played over 10 rounds — round N deals N cards, so N tricks are played that round.",
+      "Bid exactly the number of tricks you'll win, then score 20 points for each trick bid, if you're exactly right.",
+      "Bid wrong (over or under) and you lose 10 points for every trick you were off by.",
+      "Bid zero and take zero tricks: score 10 points × the round number. Bid zero and take any tricks at all: lose 10 points × the round number instead.",
+      "Bonus points — only earned if your bid was exactly right: +10 for each standard-suit 14 you capture (+20 for the black trump 14), +20 for a Pirate capturing a Mermaid, +30 for the Skull King capturing a Pirate, +40 for a Mermaid capturing the Skull King.",
+      "Highest total after 10 rounds wins. Official rules break ties with one extra round — same manual workaround as 3-2-1 Countdown if that comes up.",
+      "Point values above are editable in House Rules if you ever switch to the \"Rascal Scoring\" alternate method from the box."
+    ]
+  },
+
+  whoacowboy: {
+    label: "Whoa There Cowboy",
+    winMode: "high",
+    teamMode: "none",
+    entryType: "whoacowboy",
+    endCondition: { type: "hands", value: 3 },
+    info: [
+      "A bluffing game — announce a card (like \"two 3's\"), then either play truthfully or bluff. Numbers must climb (or later descend) each turn; call \"Whoa There Cowboy!\" if you suspect someone's lying.",
+      "Catch a real bluff: the bluffer takes back their cards plus a penalty card from the draw pile, and you earn a 10-point token. Wrongly accuse a truthful player: you owe them a card from your own hand.",
+      "Empty your hand without getting caught bluffing on that last play: earn a 20-point token, then draw 7 new cards and keep going.",
+      "End-of-round score = add up all your collected token points (10s and 20s together) and subtract however many cards are left in your hand.",
+      "The rulebook suggests 3 rounds by default but says to play as many as your family likes — adjust the round count at setup, or just tap \"End Game Now\" whenever you're done.",
+      "Highest total wins. Official tie-break is whoever scored higher in the very last round, and a genuine tie after that is a shared win — the app doesn't automate either of those, so just compare manually if it comes up."
+    ]
   }
 };
 
-var GAME_ORDER = ["rook", "handfoot", "phase10", "gnoming", "sequence", "backwards8"];
+var GAME_ORDER = ["rook", "handfoot", "phase10", "gnoming", "sequence", "backwards8", "dragoness", "countdown321", "skullking", "whoacowboy"];
 
-var GAME_SUITS = { rook: "♣", handfoot: "♦", phase10: "♠", gnoming: "♥", sequence: "♠", backwards8: "♣" };
+var GAME_SUITS = { rook: "♣", handfoot: "♦", phase10: "♠", gnoming: "♥", sequence: "♠", backwards8: "♣", dragoness: "♦", countdown321: "♣", skullking: "♠", whoacowboy: "♥" };
 
 var RED_SUITS = ["♦", "♥"];
 

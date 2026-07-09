@@ -8,7 +8,8 @@ var STORAGE_KEYS = {
   rules: "sk_rules",         // current, editable house rules (a copy of DEFAULT_RULES, mutated over time)
   history: "sk_history",     // completed games
   active: "sk_active_game",  // in-progress game, if any
-  settings: "sk_settings"
+  settings: "sk_settings",
+  gameOrder: "sk_game_order" // custom ordering of the game picker, if the user has set one
 };
 
 var Storage = {
@@ -76,6 +77,10 @@ var Storage = {
 
   getSettings() { return this._read(STORAGE_KEYS.settings, { helpSeen: false }); },
   saveSettings(s) { return this._write(STORAGE_KEYS.settings, s); },
+
+  getGameOrder() { return this._read(STORAGE_KEYS.gameOrder, null); },
+  saveGameOrder(order) { return this._write(STORAGE_KEYS.gameOrder, order); },
+  clearGameOrder() { localStorage.removeItem(STORAGE_KEYS.gameOrder); },
 
   uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 };

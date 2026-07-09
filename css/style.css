@@ -171,6 +171,13 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 
 .fab-add{ background:none;border:1.5px dashed rgba(42,38,34,.25); color:#6b6259; border-radius:10px; padding:12px; width:100%; font-weight:700; font-size:13.5px; cursor:pointer; margin-top:6px; }
 
+.reorder-row{ display:flex; align-items:center; justify-content:space-between; padding:10px 4px; border-bottom:1px solid rgba(42,38,34,.08); }
+.reorder-row:last-child{ border-bottom:none; }
+.reorder-name{ font-family:'Fraunces',serif; font-weight:600; font-size:15px; }
+.reorder-btns{ display:flex; gap:6px; }
+.reorder-btn{ width:34px; height:34px; border-radius:9px; border:1.5px solid rgba(42,38,34,.18); background:white; color:var(--felt); font-weight:800; font-size:15px; cursor:pointer; }
+.reorder-btn:disabled{ opacity:.3; cursor:not-allowed; }
+
 @media (max-width: 380px){
   .cardval-grid{ grid-template-columns:repeat(3,1fr); }
 }

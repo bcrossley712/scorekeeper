@@ -39,6 +39,28 @@ var Engine = {
     return Number(entry.cardTotal) || 0;
   },
 
+  // Skull King: entry = { manual, manualTotal, bid, tricks, bonus }, roundNum = cards dealt that round.
+  // Bonus points only ever count when the bid was made exactly right.
+  skullking(entry, rules, roundNum) {
+    if (entry.manual) return Number(entry.manualTotal) || 0;
+    const bid = Number(entry.bid) || 0;
+    const tricks = Number(entry.tricks) || 0;
+    const bonus = Number(entry.bonus) || 0;
+    const s = rules.scoring;
+    if (bid === 0) {
+      return tricks === 0 ? (s.zeroBidRoundMultiplier * roundNum + bonus) : -(s.zeroBidRoundMultiplier * roundNum);
+    }
+    return bid === tricks ? (s.perTrickMade * bid + bonus) : -s.perTrickMissedPenalty * Math.abs(bid - tricks);
+  },
+
+  // Whoa There Cowboy: entry = { manual, manualTotal, tokens, cardsLeft }
+  whoacowboy(entry) {
+    if (entry.manual) return Number(entry.manualTotal) || 0;
+    const tokens = Number(entry.tokens) || 0;
+    const left = Number(entry.cardsLeft) || 0;
+    return tokens - left;
+  },
+
   computeHandScore(gameKey, entryType, entry, handMeta, participantId, rules) {
     switch (entryType) {
       case "handfoot": return this.handfoot(entry, rules);

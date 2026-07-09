@@ -1,4 +1,4 @@
-const CACHE_NAME = "scorekeeper-v16";
+const CACHE_NAME = "scorekeeper-v20";
 const ASSETS = [
   "./",
   "./index.html",
@@ -29,6 +29,6 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request).catch(() => cached))
+    caches.match(e.request, { ignoreSearch: true }).then((cached) => cached || fetch(e.request).catch(() => cached))
   );
 });

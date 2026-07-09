@@ -42,6 +42,7 @@ var App = {
       case "history": html = Screens.history(); break;
       case "historyDetail": html = Screens.historyDetail(); break;
       case "rules": html = Screens.rules(); break;
+      case "reorderGames": html = Screens.reorderGames(); break;
       case "rulesEdit": html = Screens.rulesEdit(); break;
       case "help": html = Screens.help(); break;
       case "players": html = Screens.players(); break;
@@ -171,10 +172,10 @@ var Screens = {
       <div class="topbar">
         <button class="back-btn" onclick="App.go('home')">&larr; Back</button>
         <div class="brand" style="font-size:18px;">Choose a Game</div>
-        <span></span>
+        <button class="rules-link" onclick="App.go('reorderGames')">Reorder</button>
       </div>
       <div class="game-grid">
-        ${GAME_ORDER.map(key => {
+        ${GameOrder.getEffectiveOrder().map(key => {
           const r = DEFAULT_RULES[key];
           const fallback = `<div class="suit-fallback ${suitClass(GAME_SUITS[key])}">${GAME_SUITS[key]}</div>`;
           return `
@@ -422,7 +423,7 @@ var Screens = {
   // ---------- HOUSE RULES ----------
   rules() {
     const rules = Storage.getRules();
-    const activeKey = App.state.rulesViewKey || GAME_ORDER[0];
+    const activeKey = App.state.rulesViewKey || GameOrder.getEffectiveOrder()[0];
     App.state.rulesViewKey = activeKey; // keep state in sync with what's actually shown
     const r = rules[activeKey];
     return `
@@ -432,7 +433,7 @@ var Screens = {
         <span></span>
       </div>
       <div class="segmented wrap">
-        ${GAME_ORDER.map(k => `<button class="${k === activeKey ? "on" : ""}" onclick="App.state.rulesViewKey='${k}';App.render()">${DEFAULT_RULES[k].label}</button>`).join("")}
+        ${GameOrder.getEffectiveOrder().map(k => `<button class="${k === activeKey ? "on" : ""}" onclick="App.state.rulesViewKey='${k}';App.render()">${DEFAULT_RULES[k].label}</button>`).join("")}
       </div>
       <div class="card" style="margin-top:12px;">
         <div class="stitch"></div>
@@ -470,11 +471,19 @@ var Screens = {
         <h4>Default target score</h4>
         <input class="num-input" type="number" value="${r.endCondition.value}" oninput="RulesEdit.setEndValue(this.value)" />
       `;
+    } else if (key === "skullking") {
+      fields = `
+        <h4>Scoring</h4>
+        <div class="edit-row"><span>Points per trick (bid made)</span><input type="number" value="${r.scoring.perTrickMade}" oninput="RulesEdit.setNested('scoring','perTrickMade',this.value)" /></div>
+        <div class="edit-row"><span>Penalty per trick (bid missed)</span><input type="number" value="${r.scoring.perTrickMissedPenalty}" oninput="RulesEdit.setNested('scoring','perTrickMissedPenalty',this.value)" /></div>
+        <div class="edit-row"><span>Zero-bid round multiplier</span><input type="number" value="${r.scoring.zeroBidRoundMultiplier}" oninput="RulesEdit.setNested('scoring','zeroBidRoundMultiplier',this.value)" /></div>
+        <p class="hint-text">Switching to "Rascal Scoring" from the box? Try 10 / 5 / 10 as a starting point, then adjust to match the half-credit rule as needed.</p>
+      `;
     } else {
       fields = `<p class="hint-text">This game doesn't have editable numeric rules yet.</p>`;
     }
 
-    const editable = key === "handfoot" || key === "rook";
+    const editable = key === "handfoot" || key === "rook" || key === "skullking";
     return `
       <div class="topbar">
         <button class="back-btn" onclick="App.go('rules')">&larr; Cancel</button>
@@ -489,6 +498,33 @@ var Screens = {
         <button class="btn-primary" style="margin-top:16px;" onclick="RulesEdit.save()">Save House Rules</button>
         <p class="hint-text" style="margin-top:8px;">This changes scoring for all future ${r.label} games — games already in progress keep using the rules they started with.</p>
       ` : ``}
+    `;
+  },
+
+  // ---------- REORDER GAMES ----------
+  reorderGames() {
+    const order = GameOrder.getEffectiveOrder();
+    const isCustom = !!Storage.getGameOrder();
+    return `
+      <div class="topbar">
+        <button class="back-btn" onclick="App.go('picker')">&larr; Back</button>
+        <div class="brand" style="font-size:18px;">Reorder Games</div>
+        <span></span>
+      </div>
+      <div class="card">
+        <div class="stitch"></div>
+        <p class="hint-text">Arrange the list however your family likes. Sorted alphabetically by default. Custom Game always stays last, no matter what.</p>
+        ${order.map((key, i) => `
+          <div class="reorder-row">
+            <div class="reorder-name">${DEFAULT_RULES[key].label}</div>
+            <div class="reorder-btns">
+              <button class="reorder-btn" ${i === 0 ? "disabled" : ""} onclick="GameOrder.moveUp('${key}')">&uarr;</button>
+              <button class="reorder-btn" ${i === order.length - 1 ? "disabled" : ""} onclick="GameOrder.moveDown('${key}')">&darr;</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      <button class="btn-outline-dark" style="margin-top:14px;" ${isCustom ? "" : "disabled"} onclick="GameOrder.resetToAlphabetical()">Reset to Alphabetical</button>
     `;
   },
 

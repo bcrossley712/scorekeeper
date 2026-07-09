@@ -3,6 +3,50 @@
 // each screen function in app.js stays focused on markup.
 // ============================================================
 
+var GameOrder = {
+  alphabeticalOrder() {
+    return [...GAME_ORDER].sort((a, b) => DEFAULT_RULES[a].label.localeCompare(DEFAULT_RULES[b].label));
+  },
+
+  // Returns the order to actually display. If the user has a custom order saved,
+  // it's used as-is except: any game no longer in GAME_ORDER is dropped, and any
+  // game newly added to GAME_ORDER since they last customized (like a future new
+  // preset) gets appended alphabetically rather than wiping their whole layout.
+  getEffectiveOrder() {
+    const custom = Storage.getGameOrder();
+    if (!custom) return this.alphabeticalOrder();
+    const stillValid = custom.filter(k => GAME_ORDER.includes(k));
+    const missing = GAME_ORDER.filter(k => !stillValid.includes(k))
+      .sort((a, b) => DEFAULT_RULES[a].label.localeCompare(DEFAULT_RULES[b].label));
+    return stillValid.concat(missing);
+  },
+
+  moveUp(key) {
+    const order = this.getEffectiveOrder().slice();
+    const idx = order.indexOf(key);
+    if (idx > 0) {
+      [order[idx - 1], order[idx]] = [order[idx], order[idx - 1]];
+      Storage.saveGameOrder(order);
+    }
+    App.render();
+  },
+
+  moveDown(key) {
+    const order = this.getEffectiveOrder().slice();
+    const idx = order.indexOf(key);
+    if (idx >= 0 && idx < order.length - 1) {
+      [order[idx + 1], order[idx]] = [order[idx], order[idx + 1]];
+      Storage.saveGameOrder(order);
+    }
+    App.render();
+  },
+
+  resetToAlphabetical() {
+    Storage.clearGameOrder();
+    App.render();
+  }
+};
+
 var Players = {
   openColorId: null,
 
@@ -215,6 +259,8 @@ var Play = {
     if (entryType === "rook") return this.rookForm(game);
     if (entryType === "handfoot") return this.handfootForm(game);
     if (entryType === "phase10") return this.phase10Form(game);
+    if (entryType === "skullking") return this.skullkingForm(game);
+    if (entryType === "whoacowboy") return this.whoaCowboyForm(game);
     return this.simpleForm(game);
   },
 
@@ -335,6 +381,55 @@ var Play = {
         </div>
       `).join("")}
       <button class="btn-primary" style="margin-top:12px;" onclick="Play.savePhase10()">Save Hand &amp; Continue</button>
+    `;
+  },
+
+  skullkingForm(game) {
+    const roundNum = game.hands.length + 1;
+    return `
+      <h3 style="margin-bottom:10px;">Round ${roundNum} <span class="pill">${roundNum} card${roundNum === 1 ? "" : "s"} dealt</span></h3>
+      ${game.units.map(u => `
+        <div class="entry-unit-block" data-unit="${u.id}">
+          <div class="unit-label">${escapeHtml(u.name)}</div>
+          <div class="toggle-row">
+            <span>Just type the total instead</span>
+            <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+          </div>
+          <div class="structured-fields">
+            <div class="field-row"><label>Bid</label><input type="number" id="sk-bid-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
+            <div class="field-row"><label>Tricks won</label><input type="number" id="sk-tricks-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
+            <div class="field-row"><label>Bonus points</label><input type="number" id="sk-bonus-${u.id}" class="input-compact" placeholder="0" /></div>
+            <p class="hint-text">Bonus only counts if the bid above was exactly right.</p>
+          </div>
+          <div class="manual-fields hidden">
+            <input class="num-input" id="sk-manual-${u.id}" type="number" placeholder="0" />
+          </div>
+        </div>
+      `).join("")}
+      <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveSkullKing()">Save Round &amp; Continue</button>
+    `;
+  },
+
+  whoaCowboyForm(game) {
+    return `
+      <h3 style="margin-bottom:10px;">Enter this round</h3>
+      ${game.units.map(u => `
+        <div class="entry-unit-block" data-unit="${u.id}">
+          <div class="unit-label">${escapeHtml(u.name)}</div>
+          <div class="toggle-row">
+            <span>Just type the total instead</span>
+            <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+          </div>
+          <div class="structured-fields">
+            <div class="field-row"><label>Tokens (total points)</label><input type="number" class="wtc-tokens input-compact" placeholder="0" /></div>
+            <div class="field-row"><label>Cards left in hand</label><input type="number" class="wtc-left input-compact" placeholder="0" /></div>
+          </div>
+          <div class="manual-fields hidden">
+            <input class="num-input wtc-manual" type="number" placeholder="0" />
+          </div>
+        </div>
+      `).join("")}
+      <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveWhoaCowboy()">Save Round &amp; Continue</button>
     `;
   },
 
@@ -551,6 +646,55 @@ var Play = {
         entry = { manual: false, cardTotal, completedPhase };
       }
       entry.score = Engine.phase10(entry);
+      entries[u.id] = entry;
+    });
+    this.commitHand(entries);
+  },
+
+  saveSkullKing() {
+    const game = App.state.game;
+    const roundNum = game.hands.length + 1;
+    const entries = {};
+    for (const u of game.units) {
+      const block = document.querySelector(`.entry-unit-block[data-unit="${u.id}"]`);
+      const manual = !block.querySelector(".manual-fields").classList.contains("hidden");
+      if (manual) {
+        const manualRaw = document.getElementById(`sk-manual-${u.id}`).value;
+        if (manualRaw === "") { this.flagFieldError(`sk-manual-${u.id}`, "*missing value"); return; }
+        const manualTotal = Number(manualRaw) || 0;
+        entries[u.id] = { manual: true, manualTotal, score: manualTotal };
+      } else {
+        const bidRaw = document.getElementById(`sk-bid-${u.id}`).value;
+        const tricksRaw = document.getElementById(`sk-tricks-${u.id}`).value;
+        if (bidRaw === "") { this.flagFieldError(`sk-bid-${u.id}`, "*missing value"); return; }
+        if (tricksRaw === "") { this.flagFieldError(`sk-tricks-${u.id}`, "*missing value"); return; }
+        const bid = Number(bidRaw);
+        const tricks = Number(tricksRaw);
+        if (bid > roundNum) { this.flagFieldError(`sk-bid-${u.id}`, `*Max bid this round is ${roundNum}`); return; }
+        if (tricks > roundNum) { this.flagFieldError(`sk-tricks-${u.id}`, `*Only ${roundNum} tricks this round`); return; }
+        const bonus = Number(document.getElementById(`sk-bonus-${u.id}`).value) || 0;
+        const entry = { manual: false, bid, tricks, bonus };
+        entry.score = Engine.skullking(entry, game.rulesSnapshot, roundNum);
+        entries[u.id] = entry;
+      }
+    }
+    this.commitHand(entries);
+  },
+
+  saveWhoaCowboy() {
+    const game = App.state.game;
+    const entries = {};
+    game.units.forEach(u => {
+      const block = document.querySelector(`.entry-unit-block[data-unit="${u.id}"]`);
+      const manual = !block.querySelector(".manual-fields").classList.contains("hidden");
+      const entry = manual
+        ? { manual: true, manualTotal: Number(block.querySelector(".wtc-manual").value) || 0 }
+        : {
+            manual: false,
+            tokens: Number(block.querySelector(".wtc-tokens").value) || 0,
+            cardsLeft: Number(block.querySelector(".wtc-left").value) || 0
+          };
+      entry.score = Engine.whoacowboy(entry);
       entries[u.id] = entry;
     });
     this.commitHand(entries);
