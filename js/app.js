@@ -257,10 +257,19 @@ var Screens = {
         <div class="stitch"></div>
         <h3>Game name & rules</h3>
         <input id="customName" class="text-input" type="text" placeholder="e.g. Uno" value="${s.customName || ""}" style="margin-top:8px;" oninput="Setup.updateCustomName(this.value)"/>
+        <p class="hint-text" style="margin-top:12px;margin-bottom:6px;">How is this scored?</p>
+        <div class="segmented">
+          <button class="${s.customScoreMode === "points" ? "on" : ""}" onclick="Setup.setCustomScoreMode('points')">Point totals</button>
+          <button class="${s.customScoreMode === "winloss" ? "on" : ""}" onclick="Setup.setCustomScoreMode('winloss')">Win/Loss only</button>
+        </div>
+        ${s.customScoreMode === "winloss" ? `
+        <p class="hint-text" style="margin-top:8px;">Just tap who won and you're done — logging the winner finishes the game immediately, like Sequence or Backwards 8.</p>
+        ` : `
         <div class="toggle-row" style="margin-top:12px;">
           <span>Lower score wins</span>
           <div class="switch ${s.customWinLow ? "on" : ""}" onclick="Setup.toggleCustomWinLow()"><div class="knob"></div></div>
         </div>
+        `}
         <div class="toggle-row">
           <span>Play as teams</span>
           <div class="switch ${s.useTeams ? "on" : ""}" onclick="Setup.toggleTeams()"><div class="knob"></div></div>
@@ -331,7 +340,7 @@ var Screens = {
         `}
       </div>` : ``}
 
-      ${s.gameKey === "custom" ? `
+      ${s.gameKey === "custom" && s.customScoreMode !== "winloss" ? `
       <div class="card">
         <div class="stitch"></div>
         <h3>How should this game end?</h3>
@@ -409,6 +418,7 @@ var Screens = {
         </table>
       </div>
       <button class="btn-primary" style="margin-top:18px;" onclick="Play.rematch()">Play Again (Same Players)</button>
+      ${game.hands && game.hands.length > 0 ? `<button class="btn-outline-light" style="margin-top:10px;" onclick="Play.undoLastFromResults()">Undo Last Hand</button>` : ``}
       <button class="btn-outline-light" style="margin-top:10px;" onclick="App.go('home')">Back to Home</button>
     `;
   },

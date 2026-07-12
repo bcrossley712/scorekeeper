@@ -17,8 +17,9 @@ var Engine = {
     const clean = (Number(entry.cleanBooks) || 0) * rules.bonuses.cleanBook;
     const dirty = (Number(entry.dirtyBooks) || 0) * rules.bonuses.dirtyBook;
     const meld = Number(entry.meldTotal) || 0;
+    const bonus = Number(entry.bonus) || 0; // open-ended — went out first, or any other house-rule bonus/penalty
     const stuck = Number(entry.stuckTotal) || 0;
-    return clean + dirty + meld - stuck;
+    return clean + dirty + meld + bonus - stuck;
   },
 
   // Rook: computed per team. handMeta = { biddingTeamId, bid, trump },
@@ -142,6 +143,41 @@ var Engine = {
       const wins = this.runningWinCounts(game);
       let best = null, bestVal = -Infinity;
       Object.entries(wins).forEach(([id, v]) => { if (v > bestVal) { bestVal = v; best = id; } });
+      return best;
+    }
+    if (game.endCondition && game.endCondition.type === "phase") {
+      // Phase 10's real rule: whoever actually completes Phase 10 wins
+      // outright — score doesn't matter, even if someone else is ahead on
+      // points. Only if more than one player completes Phase 10 in that
+      // same final hand does it fall back to lowest score, and only among
+      // those tied finishers (not everyone).
+      const phases = this.phaseProgress(game);
+      const finishers = game.participantIds.filter(id => phases[id] > 10);
+      if (finishers.length === 1) return finishers[0];
+      if (finishers.length > 1) {
+        const totals = this.runningTotals(game);
+        let best = null, bestVal = Infinity;
+        finishers.forEach(id => { if (totals[id] < bestVal) { bestVal = totals[id]; best = id; } });
+        return best;
+        // A genuine tie in points among finishers should be broken by
+        // replaying Phase 10 per the rulebook — the app doesn't automate
+        // that (same documented gap as 3-2-1 Countdown/Skull King ties), so
+        // a tie here just resolves to the first finisher found.
+      }
+      // Nobody's finished Phase 10 — the game was ended early via "End Game
+      // Now" (not a scenario the official rules cover at all). Whoever has
+      // progressed furthest through the phases is considered ahead, same
+      // priority as the real rule gives phase completion over score; a tie
+      // on phase is broken by lowest score among just those tied.
+      const totals = this.runningTotals(game);
+      let best = null, bestPhase = -Infinity, bestScore = Infinity;
+      game.participantIds.forEach(id => {
+        const p = phases[id];
+        const s = totals[id] || 0;
+        if (p > bestPhase || (p === bestPhase && s < bestScore)) {
+          bestPhase = p; bestScore = s; best = id;
+        }
+      });
       return best;
     }
     const totals = this.runningTotals(game);

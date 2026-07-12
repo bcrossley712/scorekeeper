@@ -35,14 +35,15 @@ var DEFAULT_RULES = {
       redThree: -300 // always negative, no replace-on-draw rule
     },
     bonuses: { cleanBook: 500, dirtyBook: 300 },
-    meldThresholds: [50, 90, 120, 150], // rises each hand, editable
+    meldThresholds: [50, 100, 150, 200], // rises each hand by 50
     info: [
       "Family house rules — differs from the standard published version.",
       "Card values: Joker 50, 2s 20, Aces 15, 10 through King 10, 4 through 9 are 5, black 3s are 5.",
       "Red 3s always score −300 — there is no immediate-replace-on-draw rule, it's on you to get rid of it.",
       "Clean (natural) books score 500 each. Dirty (wild) books score 300 each.",
-      "Hand score = (clean books × 500) + (dirty books × 300) + total melded card points − total points stuck in hand/foot.",
-      "Default game length is 4 hands, with the minimum opening meld rising each hand (50 / 90 / 120 / 150) — both are editable in House Rules."
+      "The Bonus field is open-ended — use it for a went-out-first bonus, a bonus for pulling exactly the 26 cards needed for your hand and foot from the community pile at the start of a round, or any other house-rule bonus (or penalty, entered as a negative number).",
+      "Hand score = (clean books × 500) + (dirty books × 300) + total melded card points + bonus − total points stuck in hand/foot.",
+      "Default game length is 4 hands, with the minimum opening meld rising each hand by 50 (50 / 100 / 150 / 200). Only the hand count is currently editable in House Rules — the meld thresholds aren't wired up there yet."
     ]
   },
 
@@ -66,11 +67,13 @@ var DEFAULT_RULES = {
     teamMode: "none",
     entryType: "phase10",
     endCondition: { type: "phase", value: 10 },
-    cardValues: { numberCard: "face value", tenElevenTwelveSkip: 10, wild: 25 },
+    cardValues: { numbersOneToNine: 5, tenElevenTwelve: 10, skip: 15, wild: 25 },
     info: [
       "Each player works through 10 phases in order across as many hands as it takes.",
-      "Number cards score their face value if left in hand. 10s, 11s, 12s and Skips score 10. Wild cards score 25.",
-      "The game ends once someone completes Phase 10 — at that point, whoever has the LOWEST cumulative score wins overall, even if they weren't the one who finished Phase 10 and even if they're behind on phases."
+      "Cards numbered 1-9 score a flat 5 points each if left in hand (not their face value). 10s, 11s, and 12s score 10 points each. Skip cards score 15. Wild cards score 25.",
+      "The game ends once someone completes Phase 10 — that player wins outright, regardless of score, even if someone else has fewer points. If more than one player completes Phase 10 in that same final hand, whichever of them has the fewest total points wins.",
+      "If those tied finishers also have the exact same point total, the official rules have them replay just Phase 10 and whoever goes out first wins — the app doesn't automate that part, so if it comes up, just play the extra hand and compare manually.",
+      "Ending early with \"End Game Now\" isn't something the official rules cover, so the app treats it the same way it treats a completed game: furthest phase reached wins first, and only ties on phase fall back to lowest score."
     ]
   },
 

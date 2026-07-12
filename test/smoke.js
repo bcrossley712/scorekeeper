@@ -208,12 +208,31 @@ blocks.forEach((b) => {
   b.querySelector(".hf-clean").value = "1";
   b.querySelector(".hf-dirty").value = "1";
   b.querySelector(".hf-meld").value = "200";
+  b.querySelector(".hf-bonus").value = "100"; // e.g. a went-out-first bonus
   b.querySelector(".hf-stuck").value = "30";
 });
 Play.saveHandfoot();
 const hfTotals = Engine.runningTotals(App.state.game);
-const expected = 500 + 300 + 200 - 30;
-Object.values(hfTotals).forEach(v => assert(v === expected, `hand & foot score computed correctly (${v} === ${expected})`));
+const expected = 500 + 300 + 200 + 100 - 30;
+Object.values(hfTotals).forEach(v => assert(v === expected, `hand & foot score computed correctly, including the open-ended bonus field (${v} === ${expected})`));
+
+// 5b. The bonus field is genuinely open-ended — it can also be a penalty (negative).
+// Played as a second hand in the same still-active game (rather than a fresh one),
+// since the House Rules snapshot check right after this expects this game to still
+// be in progress.
+App.render();
+let hfBlocks2 = document.querySelectorAll(".entry-unit-block");
+hfBlocks2.forEach((b) => {
+  b.querySelector(".hf-clean").value = "0";
+  b.querySelector(".hf-dirty").value = "0";
+  b.querySelector(".hf-meld").value = "50";
+  b.querySelector(".hf-bonus").value = "-25"; // e.g. a house-rule penalty
+  b.querySelector(".hf-stuck").value = "0";
+});
+Play.saveHandfoot();
+const hfTotals2 = Engine.runningTotals(App.state.game);
+const expected2 = expected + 25; // running total from the first hand, plus this hand's 50 + (-25) = 25
+Object.values(hfTotals2).forEach(v => assert(v === expected2, `bonus field also works as a negative penalty (running total ${v} === ${expected2})`));
 
 // House rules edit flow (snapshot check: editing rules mid-game shouldn't affect active game)
 App.state.rulesViewKey = "handfoot";
@@ -228,6 +247,26 @@ assert(App.state.game.rulesSnapshot.bonuses.cleanBook === 500, "in-progress game
 
 Play.finishGame(App.state.game);
 
+// 5c. Negative-number guards: Hand & Foot's counts/totals can't go negative, but the
+// open-ended Bonus field still can (it's a deliberate exception, tested back in 5b).
+Setup.pick("handfoot");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+App.render();
+let hfNegBlocks = document.querySelectorAll(".entry-unit-block");
+hfNegBlocks.forEach((b) => {
+  b.querySelector(".hf-clean").value = "-3";
+  b.querySelector(".hf-dirty").value = "-1";
+  b.querySelector(".hf-meld").value = "-50";
+  b.querySelector(".hf-bonus").value = "0";
+  b.querySelector(".hf-stuck").value = "-10";
+});
+Play.saveHandfoot();
+const hfNegTotals = Engine.runningTotals(App.state.game);
+Object.values(hfNegTotals).forEach(v => assert(v === 0, `Hand & Foot clamps negative counts/totals to 0 rather than letting them go negative (got ${v})`));
+Play.abandonGame();
+
 // 6. Phase 10 completion detection (via manual entries) + a quantity-stepper check
 Setup.pick("phase10");
 Setup.togglePlayer(players[0].id);
@@ -235,14 +274,22 @@ Setup.togglePlayer(players[1].id);
 Setup.start();
 game = App.state.game;
 
-// First, verify the quantity stepper itself can represent multiple of the same card
+// First, verify the quantity stepper itself can hold multiples, and that scoring matches
+// the real rulebook: 1-9 are a flat 5 points each (not face value), Skip is 15 (not 10).
 App.render();
 let firstBlock = document.querySelector(".entry-unit-block");
-let eightRow = Array.from(firstBlock.querySelectorAll(".cardqty-row")).find(r => r.dataset.points === "8");
-Play.stepCardQty(eightRow.querySelector(".qty-stepper button:last-child"), 1);
-Play.stepCardQty(eightRow.querySelector(".qty-stepper button:last-child"), 1);
-Play.stepCardQty(eightRow.querySelector(".qty-stepper button:last-child"), 1); // three 8s = 24 pts
-assert(eightRow.querySelector(".qty-val").textContent === "3", "stepper can hold multiple of the same card value");
+let lowRow = Array.from(firstBlock.querySelectorAll(".cardqty-row")).find(r => r.dataset.points === "5");
+assert(!!lowRow, "the 1-9 range now has a single consolidated stepper worth a flat 5 points, not 9 separate face-value ones");
+Play.stepCardQty(lowRow.querySelector(".qty-stepper button:last-child"), 1);
+Play.stepCardQty(lowRow.querySelector(".qty-stepper button:last-child"), 1);
+Play.stepCardQty(lowRow.querySelector(".qty-stepper button:last-child"), 1); // three cards numbered 1-9 = 15 pts, regardless of which numbers
+assert(lowRow.querySelector(".qty-val").textContent === "3", "stepper can hold multiple cards in the 1-9 range");
+let skipRow = Array.from(firstBlock.querySelectorAll(".cardqty-row")).find(r => r.dataset.points === "15");
+assert(!!skipRow, "Skip is correctly worth 15 points (the rulebook value), not the old buggy 10");
+Play.stepCardQty(skipRow.querySelector(".qty-stepper button:last-child"), 1); // one Skip card = 15 pts
+Play.savePhase10();
+const p10FirstHand = App.state.game.hands[0].entries[game.units[0].id];
+assert(p10FirstHand.score === 30, "Phase 10 scoring matches the rulebook: three cards numbered 1-9 (3x5=15pts) plus one Skip (15pts) = 30 total");
 
 for (let i = 0; i < 10; i++) {
   App.render();
@@ -258,18 +305,142 @@ for (let i = 0; i < 10; i++) {
 }
 assert(App.state.screen === "results", "phase 10 auto-ended once both players completed phase 10");
 
-// 7. Sequence (win/loss tracker)
+// 6b. Phase 10 winner rule (the real fix): whoever actually completes Phase 10
+// wins outright, regardless of score — NOT whoever has the lowest score overall.
+Setup.pick("phase10");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+game = App.state.game;
+for (let i = 0; i < 10; i++) {
+  App.render();
+  const ublocks = document.querySelectorAll(".entry-unit-block");
+  // Player 0 completes every phase and racks up a much higher score.
+  ublocks[0].querySelector(".phase-complete-switch").classList.add("on");
+  ublocks[0].querySelector(".p10-manual").value = "20";
+  ublocks[0].querySelector(".manual-fields").classList.remove("hidden");
+  ublocks[0].querySelector(".structured-fields").classList.add("hidden");
+  // Player 1 never completes a single phase, but keeps a much lower score.
+  ublocks[1].querySelector(".p10-manual").value = "1";
+  ublocks[1].querySelector(".manual-fields").classList.remove("hidden");
+  ublocks[1].querySelector(".structured-fields").classList.add("hidden");
+  if (App.state.screen !== "play") break;
+  Play.savePhase10();
+}
+assert(App.state.screen === "results", "phase 10 auto-ended once the one player completed phase 10");
+const p10Standings = Play.standingsList(App.state.lastFinishedGame);
+const p10Winner = p10Standings.find(s => s.id === game.units[0].id);
+const p10Loser = p10Standings.find(s => s.id === game.units[1].id);
+assert(p10Winner.value > p10Loser.value, "sanity check: the actual Phase 10 finisher really does have the worse (higher) score here, so this genuinely tests the fix");
+assert(App.state.lastFinishedGame.winnerId === game.units[0].id, "Phase 10 winner is whoever actually completed Phase 10, even though the other player has a much lower score");
+
+// 6c. When multiple players complete Phase 10 in the same final hand, the
+// tiebreak is lowest score among just those finishers, per the rulebook.
+Setup.pick("phase10");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+game = App.state.game;
+for (let i = 0; i < 10; i++) {
+  App.render();
+  const ublocks = document.querySelectorAll(".entry-unit-block");
+  ublocks.forEach((b, idx) => {
+    b.querySelector(".phase-complete-switch").classList.add("on"); // both finish together
+    b.querySelector(".p10-manual").value = idx === 0 ? "5" : "9"; // player 0 stays lower every hand
+    b.querySelector(".manual-fields").classList.remove("hidden");
+    b.querySelector(".structured-fields").classList.add("hidden");
+  });
+  if (App.state.screen !== "play") break;
+  Play.savePhase10();
+}
+assert(App.state.screen === "results", "phase 10 auto-ended once both players completed phase 10 together");
+assert(App.state.lastFinishedGame.winnerId === game.units[0].id, "when multiple players complete Phase 10 in the same hand, the one with fewer total points wins");
+
+// 6d. Ending early ("End Game Now") before anyone completes Phase 10, with
+// everyone on the same phase: falls back to lowest score, like any other
+// low-score game.
+Setup.pick("phase10");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+game = App.state.game;
+App.render();
+let earlyEndBlocks = document.querySelectorAll(".entry-unit-block");
+earlyEndBlocks[0].querySelector(".p10-manual").value = "5";
+earlyEndBlocks[0].querySelector(".manual-fields").classList.remove("hidden");
+earlyEndBlocks[0].querySelector(".structured-fields").classList.add("hidden");
+earlyEndBlocks[1].querySelector(".p10-manual").value = "9";
+earlyEndBlocks[1].querySelector(".manual-fields").classList.remove("hidden");
+earlyEndBlocks[1].querySelector(".structured-fields").classList.add("hidden");
+Play.savePhase10(); // one hand, nobody completes a phase — both still on phase 1
+Play.endWithWinner(); // same as tapping "End Game Now" -> "Declare Winner"
+assert(App.state.lastFinishedGame.winnerId === game.units[0].id, "ending early with everyone on the same phase falls back to lowest score");
+
+// 6e. Ending early where players are on DIFFERENT phases: furthest phase
+// progress wins even with a worse score — same priority the real rule
+// gives phase completion over points, just applied to an early stop.
+Setup.pick("phase10");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+game = App.state.game;
+for (let i = 0; i < 2; i++) {
+  App.render();
+  const b2 = document.querySelectorAll(".entry-unit-block");
+  b2[0].querySelector(".phase-complete-switch").classList.add("on"); // player 0 advances every hand...
+  b2[0].querySelector(".p10-manual").value = "20"; // ...but scores worse
+  b2[0].querySelector(".manual-fields").classList.remove("hidden");
+  b2[0].querySelector(".structured-fields").classList.add("hidden");
+  b2[1].querySelector(".p10-manual").value = "1"; // player 1 never advances, but scores better
+  b2[1].querySelector(".manual-fields").classList.remove("hidden");
+  b2[1].querySelector(".structured-fields").classList.add("hidden");
+  Play.savePhase10();
+}
+const phasesBeforeEarlyEnd = Engine.phaseProgress(App.state.game);
+assert(phasesBeforeEarlyEnd[game.units[0].id] > phasesBeforeEarlyEnd[game.units[1].id], "sanity check: player 0 really is further along on phases");
+const totalsBeforeEarlyEnd = Engine.runningTotals(App.state.game);
+assert(totalsBeforeEarlyEnd[game.units[0].id] > totalsBeforeEarlyEnd[game.units[1].id], "sanity check: player 0's score really is worse, so this genuinely tests the fix");
+Play.endWithWinner(); // ended early before anyone reached Phase 10
+assert(App.state.lastFinishedGame.winnerId === game.units[0].id, "ending early: furthest phase progress wins even with a worse score, not just lowest score overall");
+
+// 6f. Phase 10's manual override can't go negative either — real Phase 10 hand
+// scores are never negative under any known variant.
+Setup.pick("phase10");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+App.render();
+let p10NegBlocks = document.querySelectorAll(".entry-unit-block");
+p10NegBlocks.forEach((b) => {
+  b.querySelector(".phase-complete-switch"); // leave off
+  b.querySelector(".p10-manual").value = "-15";
+  b.querySelector(".manual-fields").classList.remove("hidden");
+  b.querySelector(".structured-fields").classList.add("hidden");
+});
+Play.savePhase10();
+const p10NegTotals = Engine.runningTotals(App.state.game);
+Object.values(p10NegTotals).forEach(v => assert(v === 0, `Phase 10 manual override clamps negative totals to 0 (got ${v})`));
+Play.abandonGame();
+
+// 7. Sequence (win/loss tracker) — logging the winner now finishes the game immediately
 Setup.pick("sequence");
 Setup.togglePlayer(players[0].id);
 Setup.togglePlayer(players[1].id);
 Setup.start();
 game = App.state.game;
 App.render();
+assert(App.state.entryDraft.winnerId === undefined, "no winner is pre-selected when entering a win/loss game's entry screen");
+let winLossHtml = Screens.play();
+assert(!winLossHtml.includes('class="winloss-pick sel"'), "no player/team is shown as pre-selected before anyone taps one");
+assert(winLossHtml.includes('disabled onclick="Play.saveWinLoss()"'), "Log Winner is disabled until a winner is actually picked");
+Play.saveWinLoss(); // should be a no-op — nothing picked yet
+assert(App.state.screen === "play" && App.state.game.hands.length === 0, "saveWinLoss with no winner picked does nothing, doesn't log a hand or finish the game");
 Play.pickWinner(game.units[0].id);
+winLossHtml = Screens.play();
+assert(!winLossHtml.includes('disabled onclick="Play.saveWinLoss()"'), "Log Winner becomes enabled once a winner is picked");
 Play.saveWinLoss();
-assert(App.state.screen === "play", "sequence does not auto-end (manual end condition)");
-Play.endWithWinner(); // uses new 3-way flow directly
-assert(App.state.screen === "results", "sequence ends manually via End Game -> Declare Winner");
+assert(App.state.screen === "results", "logging a winner in a win/loss game (Sequence) finishes it immediately — no separate End Game step needed");
+assert(App.state.lastFinishedGame.winnerId === game.units[0].id, "the picked winner is recorded as the game's winner");
 
 // 8. Abandon-game path: no history entry, no stat changes
 Setup.pick("gnoming");
@@ -292,9 +463,9 @@ clickModalConfirm();
 const resetPlayer = Storage.getPlayers().find(p => p.id === players[0].id);
 assert(resetPlayer.wins === 0 && resetPlayer.gamesPlayed === 0, "player stats reset to zero");
 
-// 10. History persisted (gnoming, rook, handfoot, phase10, sequence = 5; abandoned game does NOT count)
+// 10. History persisted (gnoming, rook, handfoot, phase10, phase10-winner-test, phase10-tie-test, phase10-earlyend-same-phase, phase10-earlyend-diff-phase, sequence = 9; abandoned game does NOT count)
 const history = Storage.getHistory();
-assert(history.length === 5, "5 completed games recorded in history (abandoned game excluded): " + history.length);
+assert(history.length === 9, "9 completed games recorded in history (abandoned game excluded): " + history.length);
 
 // 11. Undo last hand (simple game type)
 Setup.pick("gnoming");
@@ -365,9 +536,9 @@ assert(App.state.game.units.length === 2 && App.state.game.gameKey === "gnoming"
 assert(Storage.getHistory().length === preRematchHistoryCount, "starting a rematch itself doesn't add a history entry");
 Play.abandonGame(); // don't actually play it out, just confirming the mechanics work
 
-// 14. Final history count: 5 originally + 1 new gnoming game played out for the rematch test = 6
+// 14. Final history count: 9 originally + 1 new gnoming game played out for the rematch test = 10
 const finalHistory = Storage.getHistory();
-assert(finalHistory.length === 6, "6 completed games recorded in history overall: " + finalHistory.length);
+assert(finalHistory.length === 10, "10 completed games recorded in history overall: " + finalHistory.length);
 
 // 15. Stale saved rules (from before a config change) get healed, not stuck
 const staleRules = JSON.parse(JSON.stringify(DEFAULT_RULES));
@@ -467,6 +638,41 @@ Play.saveSkullKing();
 assert(document.getElementById("sk-bid-" + game.units[0].id).classList.contains("input-error"), "a bid over the round's card count is rejected inline");
 assert(App.state.game.hands.length === 1, "the over-limit bid did not save a new hand");
 
+// Reject a negative bid, negative tricks, and negative bonus (still round 2, max bid/tricks = 2)
+App.render();
+document.getElementById("sk-bid-" + game.units[0].id).value = "-1";
+document.getElementById("sk-tricks-" + game.units[0].id).value = "1";
+document.getElementById("sk-bid-" + game.units[1].id).value = "0";
+document.getElementById("sk-tricks-" + game.units[1].id).value = "0";
+document.getElementById("sk-bid-" + game.units[2].id).value = "0";
+document.getElementById("sk-tricks-" + game.units[2].id).value = "0";
+Play.saveSkullKing();
+assert(document.getElementById("sk-bid-" + game.units[0].id).classList.contains("input-error"), "a negative bid is rejected inline");
+assert(App.state.game.hands.length === 1, "the negative bid did not save a new hand");
+
+App.render();
+document.getElementById("sk-bid-" + game.units[0].id).value = "1";
+document.getElementById("sk-tricks-" + game.units[0].id).value = "-1";
+document.getElementById("sk-bid-" + game.units[1].id).value = "0";
+document.getElementById("sk-tricks-" + game.units[1].id).value = "0";
+document.getElementById("sk-bid-" + game.units[2].id).value = "0";
+document.getElementById("sk-tricks-" + game.units[2].id).value = "0";
+Play.saveSkullKing();
+assert(document.getElementById("sk-tricks-" + game.units[0].id).classList.contains("input-error"), "negative tricks won is rejected inline");
+assert(App.state.game.hands.length === 1, "the negative tricks value did not save a new hand");
+
+App.render();
+document.getElementById("sk-bid-" + game.units[0].id).value = "1";
+document.getElementById("sk-tricks-" + game.units[0].id).value = "1";
+document.getElementById("sk-bonus-" + game.units[0].id).value = "-5";
+document.getElementById("sk-bid-" + game.units[1].id).value = "0";
+document.getElementById("sk-tricks-" + game.units[1].id).value = "0";
+document.getElementById("sk-bid-" + game.units[2].id).value = "0";
+document.getElementById("sk-tricks-" + game.units[2].id).value = "0";
+Play.saveSkullKing();
+assert(document.getElementById("sk-bonus-" + game.units[0].id).classList.contains("input-error"), "a negative bonus is rejected inline — it's only ever an addition for special captures");
+assert(App.state.game.hands.length === 1, "the negative bonus did not save a new hand");
+
 // Round 2 (2 cards dealt): Brandon bids 1, takes 2 (missed by 1) = -10*1 = -10
 App.render();
 document.getElementById("sk-bid-" + game.units[0].id).value = "1";
@@ -510,6 +716,22 @@ assert(wtcTotals[game.units[0].id] === 37, "Whoa There Cowboy: 40 token points -
 assert(wtcTotals[game.units[1].id] === -5, "Whoa There Cowboy: no tokens, 5 cards left = -5");
 Play.abandonGame();
 
+// 23b. Cards left in hand can't go negative either — tokens stays flexible since
+// there's no fixed ruleset for that field.
+Setup.pick("whoacowboy");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+game = App.state.game;
+App.render();
+document.querySelector(`.entry-unit-block[data-unit="${game.units[0].id}"] .wtc-tokens`).value = "10";
+document.querySelector(`.entry-unit-block[data-unit="${game.units[0].id}"] .wtc-left`).value = "-4";
+document.querySelector(`.entry-unit-block[data-unit="${game.units[1].id}"] .wtc-tokens`).value = "0";
+document.querySelector(`.entry-unit-block[data-unit="${game.units[1].id}"] .wtc-left`).value = "0";
+Play.saveWhoaCowboy();
+const wtcNegTotals = Engine.runningTotals(App.state.game);
+assert(wtcNegTotals[game.units[0].id] === 10, "negative cards-left is clamped to 0 rather than boosting the score (10 tokens - 0 = 10, not 10 - -4 = 14)");
+Play.abandonGame();
 // 24. "End on cue" (and the other end-condition choices) rolled out to every game whose
 // ending is just a round/score counter, not a real structural rule like Phase 10's.
 ["gnoming", "dragoness", "countdown321", "skullking", "whoacowboy"].forEach(key => {
@@ -671,5 +893,78 @@ assert(document.getElementById("updateBanner") !== null, "showUpdateBanner injec
 UI.showUpdateBanner();
 assert(document.querySelectorAll("#updateBanner").length === 1, "calling showUpdateBanner again doesn't duplicate it");
 document.getElementById("updateBanner").remove();
+
+// 34. Custom Game: point-totals mode (the pre-existing default) still works as before
+Setup.pick("custom");
+assert(App.state.setup.customScoreMode === "points", "Custom Game defaults to point totals");
+Setup.updateCustomName("Custom Card Game");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.setCustomEndType("hands");
+Setup.updateEndValue(2);
+Setup.start();
+game = App.state.game;
+assert(game.winMode === "high" && game.rulesSnapshot.entryType === "simple", "Custom Game in points mode builds a normal simple-scoring game, same as before this feature");
+fillSimple([10, 5]);
+fillSimple([3, 20]);
+assert(App.state.screen === "results", "custom points game still auto-ends at its fixed hand count");
+
+// 35. Custom Game: Win/Loss only mode (new) — for games like Uno that some families just track wins for
+Setup.pick("custom");
+Setup.updateCustomName("Uno");
+Setup.setCustomScoreMode("winloss");
+assert(App.state.setup.customScoreMode === "winloss", "Custom Game can be switched to win/loss-only scoring");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+const customSetupHtml = Screens.setup();
+assert(!customSetupHtml.includes("Lower score wins"), "the win-low toggle is hidden once win/loss-only is selected — there's no score to compare");
+assert(!customSetupHtml.includes("How should this game end?"), "the end-condition card is hidden entirely for win/loss-only custom games — it always finishes after one hand now");
+Setup.start();
+game = App.state.game;
+assert(game.winMode === "winloss" && game.rulesSnapshot.entryType === "winloss", "a win/loss-only custom game builds like Sequence/Backwards 8 under the hood");
+const playHtml = Screens.play();
+assert(playHtml.includes("Who won this game?"), "entry screen is the win/loss picker, not a point-total form");
+Play.pickWinner(game.units[0].id);
+Play.saveWinLoss();
+assert(App.state.screen === "results", "a custom win/loss game finishes immediately after logging the one deciding hand, same as Sequence/Backwards 8");
+assert(App.state.lastFinishedGame.winnerId === game.units[0].id, "the picked winner is recorded correctly");
+
+// 36. Undo Last Hand from the Results screen — recovers a mis-declared winner
+// after a game has already auto-finished, which is otherwise unreachable
+// since the Undo Last Hand button only exists on the Play screen.
+const statsBeforeUndo = JSON.stringify(Storage.getPlayers());
+const historyCountBeforeUndo = Storage.getHistory().length;
+Play.undoLastFromResults();
+clickModalConfirm();
+assert(App.state.screen === "play", "undoing the last hand from Results returns to the Play screen");
+assert(App.state.game.hands.length === 0, "the hand that finished the game was removed");
+assert(Storage.getHistory().length === historyCountBeforeUndo - 1, "the history entry that was just added is removed too");
+assert(JSON.stringify(Storage.getPlayers()) !== statsBeforeUndo, "player stats (wins/gamesPlayed) are reverted");
+const revertedPlayer = Storage.getPlayers().find(p => p.id === players[0].id);
+assert(revertedPlayer.gamesPlayed >= 0 && revertedPlayer.wins >= 0, "reverted stats never go negative");
+// Now actually fix it — declare the other player the winner instead, and finish for real
+Play.pickWinner(game.units[1].id);
+Play.saveWinLoss();
+assert(App.state.lastFinishedGame.winnerId === game.units[1].id, "after undoing, the corrected winner is recorded");
+Play.undoLastFromResults();
+cancelModalConfirm();
+assert(App.state.screen === "results", "cancelling the undo-last-hand confirmation leaves the finished game alone");
+
+// 37. The same Results-screen undo also works generically for a normal
+// scoring game that auto-finished by hitting its hand/target limit, not
+// just win/loss games — the gap was never really winloss-specific.
+Setup.pick("gnoming");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+fillSimple([10, 20]);
+fillSimple([5, 8]);
+fillSimple([1, 2]); // 3rd hand hits gnoming's default 3-hand limit and auto-finishes
+assert(App.state.screen === "results", "gnoming auto-finished at its hand limit");
+Play.undoLastFromResults();
+clickModalConfirm();
+assert(App.state.screen === "play", "Undo Last Hand from Results works for a normal scoring game too, not just win/loss games");
+assert(App.state.game.hands.length === 2, "only the final hand that triggered the finish was removed, the other 2 remain");
+Play.abandonGame();
 
 console.log("\\nALL SMOKE TESTS PASSED");

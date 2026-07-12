@@ -116,6 +116,7 @@ var Setup = {
       endValue: gr && gr.endCondition && gr.endCondition.value ? gr.endCondition.value : 10,
       customName: "",
       customWinLow: false,
+      customScoreMode: "points",   // "points" (plain totals) or "winloss" (just track who won, like Sequence/Backwards 8)
       customTeamMode: "choice",
       customEndType: "manual"
     };
@@ -172,6 +173,10 @@ var Setup = {
   updateEndValue(val) { App.state.setup.endValue = Number(val) || 0; },
   updateCustomName(val) { App.state.setup.customName = val; },
   toggleCustomWinLow() { App.state.setup.customWinLow = !App.state.setup.customWinLow; App.render(); },
+  setCustomScoreMode(mode) {
+    App.state.setup.customScoreMode = mode;
+    App.render();
+  },
   setCustomEndType(type) { App.state.setup.customEndType = type; App.render(); },
 
   allPlayersById(s) {
@@ -216,7 +221,7 @@ var Setup = {
       if (unassigned > 0) return "Assign every player to a team.";
       if (t1 === 0 || t2 === 0) return "Both teams need at least one player.";
     }
-    if (s.gameKey === "custom" && s.customEndType !== "manual" && (!s.endValue || s.endValue <= 0)) return "Enter a valid number.";
+    if (s.gameKey === "custom" && s.customScoreMode !== "winloss" && s.customEndType !== "manual" && (!s.endValue || s.endValue <= 0)) return "Enter a valid number.";
     return "";
   },
 
@@ -228,9 +233,15 @@ var Setup = {
 
     if (s.gameKey === "custom") {
       label = s.customName.trim();
-      winMode = s.customWinLow ? "low" : "high";
-      rulesSnapshot = { label, entryType: "simple", info: ["Custom game — plain point totals per hand."] };
-      endCondition = s.customEndType === "manual" ? { type: "manual" } : { type: s.customEndType, value: s.endValue };
+      if (s.customScoreMode === "winloss") {
+        winMode = "winloss";
+        rulesSnapshot = { label, entryType: "winloss", info: ["Custom game — just tracks who won each hand, no point totals."] };
+        endCondition = { type: "manual" }; // moot — saveWinLoss() always finishes after one hand regardless
+      } else {
+        winMode = s.customWinLow ? "low" : "high";
+        rulesSnapshot = { label, entryType: "simple", info: ["Custom game — plain point totals per hand."] };
+        endCondition = s.customEndType === "manual" ? { type: "manual" } : { type: s.customEndType, value: s.endValue };
+      }
     } else {
       const rules = Storage.getRules();
       const gr = rules[s.gameKey];
@@ -302,10 +313,12 @@ var Play = {
             <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
           </div>
           <div class="structured-fields">
-            <div class="field-row"><label>Clean books</label><input type="number" class="hf-clean" placeholder="0" /></div>
-            <div class="field-row"><label>Dirty books</label><input type="number" class="hf-dirty" placeholder="0" /></div>
-            <div class="field-row"><label>Meld total</label><input type="number" class="hf-meld" placeholder="0" /></div>
-            <div class="field-row"><label>Stuck in hand/foot</label><input type="number" class="hf-stuck" placeholder="0" /></div>
+            <div class="field-row"><label>Clean books</label><input type="number" class="hf-clean" min="0" placeholder="0" /></div>
+            <div class="field-row"><label>Dirty books</label><input type="number" class="hf-dirty" min="0" placeholder="0" /></div>
+            <div class="field-row"><label>Meld total</label><input type="number" class="hf-meld" min="0" placeholder="0" /></div>
+            <div class="field-row"><label>Bonus</label><input type="number" class="hf-bonus" placeholder="0" /></div>
+            <p class="hint-text" style="margin-top:-4px;margin-bottom:10px;">e.g. went out first, or pulled your exact 26 cards from the community pile — enter as points (negative for a penalty).</p>
+            <div class="field-row"><label>Stuck in hand/foot</label><input type="number" class="hf-stuck" min="0" placeholder="0" /></div>
           </div>
           <div class="manual-fields hidden">
             <input class="num-input hf-manual" type="number" placeholder="0" />
@@ -358,10 +371,11 @@ var Play = {
 
   phase10Form(game) {
     const phases = Engine.phaseProgress(game);
+    // Per the official rulebook: cards numbered 1-9 are a flat 5 points each
+    // (not face value), 10/11/12 are 10 points, Skip is 15 points, Wild is 25.
     const cardVals = [
-      { label: "1", pts: 1 }, { label: "2", pts: 2 }, { label: "3", pts: 3 }, { label: "4", pts: 4 },
-      { label: "5", pts: 5 }, { label: "6", pts: 6 }, { label: "7", pts: 7 }, { label: "8", pts: 8 },
-      { label: "9", pts: 9 }, { label: "10/11/12", pts: 10 }, { label: "Skip", pts: 10 }, { label: "Wild", pts: 25 }
+      { label: "1 through 9", pts: 5 }, { label: "10, 11, 12", pts: 10 },
+      { label: "Skip", pts: 15 }, { label: "Wild", pts: 25 }
     ];
     return `
       <h3 style="margin-bottom:10px;">Enter this hand</h3>
@@ -377,7 +391,7 @@ var Play = {
             <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
           </div>
           <div class="structured-fields">
-            <p class="hint-text">Tap + for every card of that value left in hand (you can have more than one of the same number).</p>
+            <p class="hint-text">Tap + for every card left in hand that falls in that range (doesn't matter which exact number).</p>
             ${cardVals.map(c => `
               <div class="cardqty-row" data-points="${c.pts}">
                 <span class="cardqty-label">${c.label}<span class="pts">${c.pts}pt</span></span>
@@ -390,7 +404,7 @@ var Play = {
             `).join("")}
           </div>
           <div class="manual-fields hidden">
-            <input class="num-input p10-manual" type="number" placeholder="0" />
+            <input class="num-input p10-manual" type="number" min="0" placeholder="0" />
           </div>
         </div>
       `).join("")}
@@ -436,7 +450,7 @@ var Play = {
           </div>
           <div class="structured-fields">
             <div class="field-row"><label>Tokens (total points)</label><input type="number" class="wtc-tokens input-compact" placeholder="0" /></div>
-            <div class="field-row"><label>Cards left in hand</label><input type="number" class="wtc-left input-compact" placeholder="0" /></div>
+            <div class="field-row"><label>Cards left in hand</label><input type="number" class="wtc-left input-compact" min="0" placeholder="0" /></div>
           </div>
           <div class="manual-fields hidden">
             <input class="num-input wtc-manual" type="number" placeholder="0" />
@@ -448,16 +462,16 @@ var Play = {
   },
 
   winLossForm(game) {
-    if (!App.state.entryDraft.winnerId) App.state.entryDraft.winnerId = game.units[0].id;
+    const picked = App.state.entryDraft.winnerId;
     return `
       <h3 style="margin-bottom:10px;">Who won this game?</h3>
       ${game.units.map(u => `
-        <div class="winloss-pick ${App.state.entryDraft.winnerId === u.id ? "sel" : ""}" onclick="Play.pickWinner('${u.id}')">
+        <div class="winloss-pick ${picked === u.id ? "sel" : ""}" onclick="Play.pickWinner('${u.id}')">
           <div class="avatar">${initials(u.name)}</div>
           <div class="player-name">${escapeHtml(u.name)}</div>
         </div>
       `).join("")}
-      <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveWinLoss()">Log Winner</button>
+      <button class="btn-primary" style="margin-top:12px;" ${picked ? "" : "disabled"} onclick="Play.saveWinLoss()">Log Winner</button>
     `;
   },
 
@@ -505,10 +519,11 @@ var Play = {
         ? { manual: true, manualTotal: Number(block.querySelector(".hf-manual").value) || 0 }
         : {
             manual: false,
-            cleanBooks: Number(block.querySelector(".hf-clean").value) || 0,
-            dirtyBooks: Number(block.querySelector(".hf-dirty").value) || 0,
-            meldTotal: Number(block.querySelector(".hf-meld").value) || 0,
-            stuckTotal: Number(block.querySelector(".hf-stuck").value) || 0
+            cleanBooks: Math.max(0, Number(block.querySelector(".hf-clean").value) || 0),
+            dirtyBooks: Math.max(0, Number(block.querySelector(".hf-dirty").value) || 0),
+            meldTotal: Math.max(0, Number(block.querySelector(".hf-meld").value) || 0),
+            bonus: Number(block.querySelector(".hf-bonus").value) || 0, // open-ended on purpose — can be negative (a penalty)
+            stuckTotal: Math.max(0, Number(block.querySelector(".hf-stuck").value) || 0)
           };
       entry.score = Engine.handfoot(entry, rules);
       entries[u.id] = entry;
@@ -649,7 +664,7 @@ var Play = {
       const completedPhase = block.querySelector(".phase-complete-switch").classList.contains("on");
       let entry;
       if (manual) {
-        entry = { manual: true, manualTotal: Number(block.querySelector(".p10-manual").value) || 0, completedPhase };
+        entry = { manual: true, manualTotal: Math.max(0, Number(block.querySelector(".p10-manual").value) || 0), completedPhase };
       } else {
         let cardTotal = 0;
         block.querySelectorAll(".cardqty-row").forEach(row => {
@@ -684,9 +699,13 @@ var Play = {
         if (tricksRaw === "") { this.flagFieldError(`sk-tricks-${u.id}`, "*missing value"); return; }
         const bid = Number(bidRaw);
         const tricks = Number(tricksRaw);
+        if (bid < 0) { this.flagFieldError(`sk-bid-${u.id}`, "*Bid can't be negative"); return; }
         if (bid > roundNum) { this.flagFieldError(`sk-bid-${u.id}`, `*Max bid this round is ${roundNum}`); return; }
+        if (tricks < 0) { this.flagFieldError(`sk-tricks-${u.id}`, "*Tricks can't be negative"); return; }
         if (tricks > roundNum) { this.flagFieldError(`sk-tricks-${u.id}`, `*Only ${roundNum} tricks this round`); return; }
-        const bonus = Number(document.getElementById(`sk-bonus-${u.id}`).value) || 0;
+        const bonusRaw = document.getElementById(`sk-bonus-${u.id}`).value;
+        const bonus = Number(bonusRaw) || 0;
+        if (bonus < 0) { this.flagFieldError(`sk-bonus-${u.id}`, "*Bonus can't be negative — it's only ever an addition for special captures"); return; }
         const entry = { manual: false, bid, tricks, bonus };
         entry.score = Engine.skullking(entry, game.rulesSnapshot, roundNum);
         entries[u.id] = entry;
@@ -705,8 +724,8 @@ var Play = {
         ? { manual: true, manualTotal: Number(block.querySelector(".wtc-manual").value) || 0 }
         : {
             manual: false,
-            tokens: Number(block.querySelector(".wtc-tokens").value) || 0,
-            cardsLeft: Number(block.querySelector(".wtc-left").value) || 0
+            tokens: Number(block.querySelector(".wtc-tokens").value) || 0, // no fixed ruleset for this one, left flexible
+            cardsLeft: Math.max(0, Number(block.querySelector(".wtc-left").value) || 0)
           };
       entry.score = Engine.whoacowboy(entry);
       entries[u.id] = entry;
@@ -717,10 +736,15 @@ var Play = {
   saveWinLoss() {
     const game = App.state.game;
     const winnerId = App.state.entryDraft.winnerId;
+    if (!winnerId) return; // shouldn't happen — the button is disabled until someone's picked — but don't log a hand with no winner
     game.hands.push({ handNum: game.hands.length + 1, winnerId });
     App.state.entryDraft = {};
     Storage.saveActiveGame(game);
-    this.afterHandSaved(game);
+    // Win/loss games (Sequence, Backwards 8, custom Win/Loss) are a single
+    // complete game with one outcome — logging the winner always finishes
+    // it immediately. Fixed Hands / Target / manual don't really apply to
+    // a "who won" tracker, so this bypasses that whole system on purpose.
+    this.finishGame(game);
   },
 
   commitHand(entries, handMeta) {
@@ -791,6 +815,57 @@ var Play = {
         `).join("")}
       </div>`;
     return totalsTable + handHistory;
+  },
+
+  // Undoes whichever hand just finished the game — reverses the player-stat
+  // bump and history entry finishGame() applied, then hands you back to the
+  // Play screen with that hand removed, ready to re-enter it. Needed because
+  // "Undo Last Hand" only exists on the Play screen, so a game that
+  // auto-finishes (hit its target/hand-count, or a win/loss game logging its
+  // one deciding hand) otherwise leaves no way to fix a mis-entered final hand.
+  undoLastFromResults() {
+    const finished = App.state.lastFinishedGame;
+    if (!finished || !finished.hands || finished.hands.length === 0) return;
+    UI.confirm("Undo the last hand? It'll be removed from this game (and out of History), and you'll go back to entering hands.", () => {
+      const players = Storage.getPlayers();
+      const playerMap = {};
+      players.forEach(p => (playerMap[p.id] = p));
+      const allMemberIds = new Set();
+      finished.units.forEach(u => u.memberIds.forEach(id => allMemberIds.add(id)));
+      const winningUnit = finished.units.find(u => u.id === finished.winnerId);
+      const winningMemberIds = new Set(winningUnit ? winningUnit.memberIds : []);
+      allMemberIds.forEach(id => {
+        if (playerMap[id]) {
+          playerMap[id].gamesPlayed = Math.max(0, (playerMap[id].gamesPlayed || 0) - 1);
+          if (winningMemberIds.has(id)) playerMap[id].wins = Math.max(0, (playerMap[id].wins || 0) - 1);
+        }
+      });
+      Storage.savePlayers(players);
+
+      Storage.deleteHistoryEntry(finished.id);
+
+      const game = {
+        id: finished.id,
+        gameKey: finished.gameKey,
+        customName: finished.customName,
+        units: finished.units,
+        participantIds: finished.participantIds,
+        mode: finished.mode,
+        winMode: finished.winMode,
+        rulesSnapshot: finished.rulesSnapshot,
+        endCondition: finished.endCondition,
+        hands: finished.hands.slice(0, -1),
+        status: "active",
+        createdAt: finished.createdAt
+      };
+      if (game.gameKey === "rook") this.recomputeLastRookInfo(game);
+
+      Storage.saveActiveGame(game);
+      App.state.game = game;
+      App.state.lastFinishedGame = null;
+      App.state.entryDraft = {};
+      App.go("play");
+    }, { title: "Undo the last hand?", confirmLabel: "Undo & Keep Playing" });
   },
 
   rematch() {
