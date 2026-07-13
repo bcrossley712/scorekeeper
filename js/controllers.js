@@ -514,7 +514,7 @@ var Play = {
             <div class="structured-fields">
               <div class="field-row"><label>${this.fieldLabelText("Bid", "Bid")}</label><input type="number" id="sk-bid-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
               <div class="field-row"><label>${this.fieldLabelText("Tricks won", "Won")}</label><input type="number" id="sk-tricks-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
-              <div class="field-row"><label>${this.fieldLabelText("Bonus points", "Bonus")}</label><input type="number" id="sk-bonus-${u.id}" class="input-compact" placeholder="0" /></div>
+              <div class="field-row"><label>${this.fieldLabelText("Bonus points", "Bonus")}</label><input type="number" id="sk-bonus-${u.id}" class="input-compact digits-3" placeholder="0" /></div>
               <p class="hint-text">Bonus only counts if the bid above was exactly right.</p>
             </div>
             <div class="manual-fields hidden">
@@ -539,7 +539,7 @@ var Play = {
               <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
             </div>
             <div class="structured-fields">
-              <div class="field-row"><label>${this.fieldLabelText("Tokens (total points)", "Tokens")}</label><input type="number" class="wtc-tokens input-compact" placeholder="0" /></div>
+              <div class="field-row"><label>${this.fieldLabelText("Tokens (total points)", "Tokens")}</label><input type="number" class="wtc-tokens input-compact digits-3" placeholder="0" /></div>
               <div class="field-row"><label>${this.fieldLabelText("Cards left in hand", "Left")}</label><input type="number" class="wtc-left input-compact" min="0" placeholder="0" /></div>
             </div>
             <div class="manual-fields hidden">
@@ -571,7 +571,7 @@ var Play = {
               </label>
               <div class="field-row c321-total-row">
                 <label>Total</label>
-                <input type="number" id="c321-total-${u.id}" class="input-compact c321-total" min="0" placeholder="0" />
+                <input type="number" id="c321-total-${u.id}" class="input-compact digits-3 c321-total" min="0" placeholder="0" />
               </div>
             </div>
           </div>

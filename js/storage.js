@@ -46,6 +46,26 @@ var Storage = {
     // a new game, etc). Fill in anything missing without touching what they've
     // already customized, then persist the healed copy so this only happens once.
     const merged = this._mergeMissing(rules, DEFAULT_RULES);
+
+    // _mergeMissing only fills in keys that are completely absent — it can't
+    // fix a key that already exists with an outdated VALUE, which is exactly
+    // what happens to entryType/info/label/winMode/teamMode whenever a code
+    // update changes one of them: the very first getRules() call ever made
+    // on this device already wrote the old value in, so it's "present" and
+    // never gets healed. Those five fields are never user-editable (RulesEdit
+    // only ever touches nested numeric fields like endCondition, scoring,
+    // bonuses, cardValues — real house-rule stuff), so it's always safe to
+    // re-sync them from the current code on every load. Anything actually
+    // customizable stays untouched.
+    Object.keys(DEFAULT_RULES).forEach(key => {
+      if (!merged[key]) return;
+      merged[key].entryType = DEFAULT_RULES[key].entryType;
+      merged[key].info = JSON.parse(JSON.stringify(DEFAULT_RULES[key].info));
+      merged[key].label = DEFAULT_RULES[key].label;
+      merged[key].winMode = DEFAULT_RULES[key].winMode;
+      merged[key].teamMode = DEFAULT_RULES[key].teamMode;
+    });
+
     this._write(STORAGE_KEYS.rules, merged);
     return merged;
   },

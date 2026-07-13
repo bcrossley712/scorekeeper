@@ -213,9 +213,15 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 .entry-grid.is-compact.inline-fields .field-row label{
   font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:#928873;
 }
-.entry-grid.is-compact.inline-fields .field-row input,
+.entry-grid.is-compact.inline-fields .field-row input.input-compact,
 .entry-grid.is-compact.inline-fields .field-row select{
-  width:3.6rem; padding:6px 4px; font-size:13px; text-align:center;
+  width:2.6rem; padding:6px 3px; font-size:13px; text-align:center;
+}
+/* Most fields (Bid, Won, cards left, etc.) only ever need 2 digits. A few
+   (Bonus, running token totals) can realistically run to 3 — tagged with
+   .digits-3 in the markup rather than guessing from the field itself. */
+.entry-grid.is-compact.inline-fields .field-row input.input-compact.digits-3{
+  width:3.3rem;
 }
 .entry-grid.is-compact.inline-fields .check-inline{ font-size:12px; gap:5px; }
 .entry-grid.is-compact.inline-fields .check-inline input[type="checkbox"]{ width:16px; height:16px; }

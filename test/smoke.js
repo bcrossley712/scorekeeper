@@ -1152,4 +1152,23 @@ Play.toggleCollapse(chevron);
 assert(!block.classList.contains("collapsed"), "toggling again re-expands the card");
 Play.abandonGame();
 
+// 40. Stale persisted rules healing. A device that opened the app before a
+// code-owned field (entryType, info, label, winMode, teamMode) changed will
+// have that OLD value permanently saved — _mergeMissing only fills in keys
+// that are entirely absent, it can't fix one that already exists with a
+// stale value. getRules() must re-sync those five specific fields from the
+// current code on every load, while leaving anything actually
+// user-customizable (endCondition, scoring, bonuses, cardValues) untouched.
+const staleRulesForCodeFieldHeal = JSON.parse(JSON.stringify(DEFAULT_RULES));
+staleRulesForCodeFieldHeal.countdown321.entryType = "simple"; // the exact real-world bug this fixes
+staleRulesForCodeFieldHeal.countdown321.info = ["stale pre-fix scoring text"];
+staleRulesForCodeFieldHeal.handfoot.endCondition.value = 7; // a genuine house-rule customization
+window.localStorage.setItem("sk_rules", JSON.stringify(staleRulesForCodeFieldHeal));
+const healed = Storage.getRules();
+assert(healed.countdown321.entryType === "countdown321", "a stale entryType heals back to the current code value on load");
+assert(JSON.stringify(healed.countdown321.info) === JSON.stringify(DEFAULT_RULES.countdown321.info), "stale info text heals to the current code value on load");
+assert(healed.handfoot.endCondition.value === 7, "a genuine house-rule customization (endCondition.value) survives the heal");
+const rawAfterHeal = JSON.parse(window.localStorage.getItem("sk_rules"));
+assert(rawAfterHeal.countdown321.entryType === "countdown321", "the healed rules are persisted back to storage, not just healed in-memory for one call");
+
 console.log("\\nALL SMOKE TESTS PASSED");
