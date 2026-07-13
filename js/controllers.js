@@ -3,6 +3,63 @@
 // each screen function in app.js stays focused on markup.
 // ============================================================
 
+var Density = {
+  get() { return Storage.getSettings().scoreEntryDensity || "comfortable"; },
+
+  set(mode) {
+    const s = Storage.getSettings();
+    s.scoreEntryDensity = mode;
+    Storage.saveSettings(s);
+    App.render();
+  },
+
+  toggle() { this.set(this.get() === "compact" ? "comfortable" : "compact"); },
+
+  // Called only from finishGame() — an abandoned game (no winner) never counts.
+  recordGameCompleted() {
+    const s = Storage.getSettings();
+    s.gamesCompletedCount = (s.gamesCompletedCount || 0) + 1;
+    if (s.gamesCompletedCount >= 2 && !s.densityIntroSeen) {
+      s.densityIntroSeen = true;
+      // If they've already found the toggle and switched themselves, don't
+      // flip anything or show the modal — they already know it's there.
+      if (s.scoreEntryDensity !== "compact") {
+        s.scoreEntryDensity = "compact";
+        s.showDensityIntroModal = true;
+      }
+    }
+    Storage.saveSettings(s);
+  },
+
+  // Checked once, right after landing on the results screen post-finishGame().
+  maybeShowIntroModal() {
+    const s = Storage.getSettings();
+    if (!s.showDensityIntroModal) return;
+    s.showDensityIntroModal = false;
+    Storage.saveSettings(s);
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal">
+        <h3>Faster score entry</h3>
+        <p class="hint-text">Now that you've played a couple games, score entry has switched to a more compact layout &mdash; everyone fits with less scrolling. Look for the small toggle at the top of any entry screen if you ever want to switch views.</p>
+        <button class="btn-primary" onclick="this.closest('.modal-overlay').remove()">Got it</button>
+        <button class="btn-outline-dark" style="margin-top:10px;" onclick="Density.set('comfortable'); this.closest('.modal-overlay').remove()">Switch Back to Comfortable</button>
+      </div>`;
+    document.body.appendChild(overlay);
+  },
+
+  toggleHtml() {
+    const compact = this.get() === "compact";
+    return `
+      <div class="density-toggle-quiet">
+        <button class="density-quiet-btn" onclick="Density.toggle()">${compact ? "Comfortable view" : "Compact view"}</button>
+      </div>
+    `;
+  }
+};
+
 var GameOrder = {
   alphabeticalOrder() {
     return [...GAME_ORDER].sort((a, b) => DEFAULT_RULES[a].label.localeCompare(DEFAULT_RULES[b].label));
@@ -49,6 +106,24 @@ var GameOrder = {
 
 var Players = {
   openColorId: null,
+
+  // Leaderboard order for the Home screen: anyone with at least one game
+  // played is ranked by wins (desc), then games played (asc) as a tiebreak —
+  // same win count, fewer games looks better. Anyone who hasn't played yet
+  // (0 games) always sinks below that group, sorted alphabetically, so a
+  // fresh 0-0 player never outranks someone who's played and just hasn't
+  // won yet.
+  leaderboardOrder(players) {
+    const played = players.filter(p => (p.gamesPlayed || 0) > 0);
+    const unplayed = players.filter(p => (p.gamesPlayed || 0) === 0);
+    played.sort((a, b) => {
+      const winsDiff = (b.wins || 0) - (a.wins || 0);
+      if (winsDiff !== 0) return winsDiff;
+      return (a.gamesPlayed || 0) - (b.gamesPlayed || 0);
+    });
+    unplayed.sort((a, b) => a.name.localeCompare(b.name));
+    return played.concat(unplayed);
+  },
 
   add() {
     const input = document.getElementById("newPlayerName");
@@ -286,18 +361,21 @@ var Play = {
     if (entryType === "phase10") return this.phase10Form(game);
     if (entryType === "skullking") return this.skullkingForm(game);
     if (entryType === "whoacowboy") return this.whoaCowboyForm(game);
+    if (entryType === "countdown321") return this.countdown321Form(game);
     return this.simpleForm(game);
   },
 
   simpleForm(game) {
     return `
       <h3 style="margin-bottom:10px;">Enter hand totals</h3>
-      ${game.units.map(u => `
-        <div class="entry-unit-block" data-unit="${u.id}">
-          <div class="unit-label">${escapeHtml(u.name)}</div>
-          <input class="num-input simple-total" type="number" placeholder="0" />
-        </div>
-      `).join("")}
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+        ${game.units.map(u => `
+          <div class="entry-unit-block" data-unit="${u.id}">
+            <div class="unit-label">${escapeHtml(u.name)}</div>
+            <input class="num-input simple-total" type="number" placeholder="0" />
+          </div>
+        `).join("")}
+      </div>
       <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveSimple()">Save Hand &amp; Continue</button>
     `;
   },
@@ -305,26 +383,28 @@ var Play = {
   handfootForm(game) {
     return `
       <h3 style="margin-bottom:10px;">Enter this hand</h3>
-      ${game.units.map(u => `
-        <div class="entry-unit-block" data-unit="${u.id}">
-          <div class="unit-label">${escapeHtml(u.name)}</div>
-          <div class="toggle-row">
-            <span>Just type the total instead</span>
-            <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+        ${game.units.map(u => `
+          <div class="entry-unit-block" data-unit="${u.id}">
+            <div class="unit-label">${escapeHtml(u.name)}</div>
+            <div class="toggle-row">
+              <span>Just type the total instead</span>
+              <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+            </div>
+            <div class="structured-fields">
+              <div class="field-row"><label>Clean books</label><input type="number" class="hf-clean" min="0" placeholder="0" /></div>
+              <div class="field-row"><label>Dirty books</label><input type="number" class="hf-dirty" min="0" placeholder="0" /></div>
+              <div class="field-row"><label>Meld total</label><input type="number" class="hf-meld" min="0" placeholder="0" /></div>
+              <div class="field-row"><label>Bonus</label><input type="number" class="hf-bonus" placeholder="0" /></div>
+              <p class="hint-text" style="margin-top:-4px;margin-bottom:10px;">e.g. went out first, or pulled your exact 26 cards from the community pile — enter as points (negative for a penalty).</p>
+              <div class="field-row"><label>Stuck in hand/foot</label><input type="number" class="hf-stuck" min="0" placeholder="0" /></div>
+            </div>
+            <div class="manual-fields hidden">
+              <input class="num-input hf-manual" type="number" placeholder="0" />
+            </div>
           </div>
-          <div class="structured-fields">
-            <div class="field-row"><label>Clean books</label><input type="number" class="hf-clean" min="0" placeholder="0" /></div>
-            <div class="field-row"><label>Dirty books</label><input type="number" class="hf-dirty" min="0" placeholder="0" /></div>
-            <div class="field-row"><label>Meld total</label><input type="number" class="hf-meld" min="0" placeholder="0" /></div>
-            <div class="field-row"><label>Bonus</label><input type="number" class="hf-bonus" placeholder="0" /></div>
-            <p class="hint-text" style="margin-top:-4px;margin-bottom:10px;">e.g. went out first, or pulled your exact 26 cards from the community pile — enter as points (negative for a penalty).</p>
-            <div class="field-row"><label>Stuck in hand/foot</label><input type="number" class="hf-stuck" min="0" placeholder="0" /></div>
-          </div>
-          <div class="manual-fields hidden">
-            <input class="num-input hf-manual" type="number" placeholder="0" />
-          </div>
-        </div>
-      `).join("")}
+        `).join("")}
+      </div>
       <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveHandfoot()">Save Hand &amp; Continue</button>
     `;
   },
@@ -358,12 +438,14 @@ var Play = {
         <p class="hint-text">The other team automatically gets what's left out of 100.</p>
       </div>
       <div id="rookManualFields" class="hidden">
-        ${game.units.map(u => `
-          <div class="entry-unit-block" data-unit="${u.id}">
-            <div class="unit-label">${escapeHtml(u.name)}</div>
-            <input class="num-input rook-manual" type="number" placeholder="0" />
-          </div>
-        `).join("")}
+        <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+          ${game.units.map(u => `
+            <div class="entry-unit-block" data-unit="${u.id}">
+              <div class="unit-label">${escapeHtml(u.name)}</div>
+              <input class="num-input rook-manual" type="number" placeholder="0" />
+            </div>
+          `).join("")}
+        </div>
       </div>
       <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveRook()">Save Hand &amp; Continue</button>
     `;
@@ -379,35 +461,37 @@ var Play = {
     ];
     return `
       <h3 style="margin-bottom:10px;">Enter this hand</h3>
-      ${game.units.map(u => `
-        <div class="entry-unit-block" data-unit="${u.id}">
-          <div class="unit-label">${escapeHtml(u.name)} <span class="pill">${phases[u.id] > 10 ? "Complete!" : "Phase " + phases[u.id]}</span></div>
-          <div class="toggle-row">
-            <span>Completed this phase</span>
-            <div class="switch phase-complete-switch" onclick="Play.toggleManualSwitch(this,true)"><div class="knob"></div></div>
-          </div>
-          <div class="toggle-row">
-            <span>Just type the total instead</span>
-            <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
-          </div>
-          <div class="structured-fields">
-            <p class="hint-text">Tap + for every card left in hand that falls in that range (doesn't matter which exact number).</p>
-            ${cardVals.map(c => `
-              <div class="cardqty-row" data-points="${c.pts}">
-                <span class="cardqty-label">${c.label}<span class="pts">${c.pts}pt</span></span>
-                <div class="qty-stepper">
-                  <button type="button" onclick="Play.stepCardQty(this,-1)">&minus;</button>
-                  <span class="qty-val">0</span>
-                  <button type="button" onclick="Play.stepCardQty(this,1)">+</button>
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+        ${game.units.map(u => `
+          <div class="entry-unit-block" data-unit="${u.id}">
+            <div class="unit-label">${escapeHtml(u.name)} <span class="pill">${phases[u.id] > 10 ? "Complete!" : "Phase " + phases[u.id]}</span></div>
+            <div class="toggle-row">
+              <span>Completed this phase</span>
+              <div class="switch phase-complete-switch" onclick="Play.toggleManualSwitch(this,true)"><div class="knob"></div></div>
+            </div>
+            <div class="toggle-row">
+              <span>Just type the total instead</span>
+              <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+            </div>
+            <div class="structured-fields">
+              <p class="hint-text">Tap + for every card left in hand that falls in that range (doesn't matter which exact number).</p>
+              ${cardVals.map(c => `
+                <div class="cardqty-row" data-points="${c.pts}">
+                  <span class="cardqty-label">${c.label}<span class="pts">${c.pts}pt</span></span>
+                  <div class="qty-stepper">
+                    <button type="button" onclick="Play.stepCardQty(this,-1)">&minus;</button>
+                    <span class="qty-val">0</span>
+                    <button type="button" onclick="Play.stepCardQty(this,1)">+</button>
+                  </div>
                 </div>
-              </div>
-            `).join("")}
+              `).join("")}
+            </div>
+            <div class="manual-fields hidden">
+              <input class="num-input p10-manual" type="number" min="0" placeholder="0" />
+            </div>
           </div>
-          <div class="manual-fields hidden">
-            <input class="num-input p10-manual" type="number" min="0" placeholder="0" />
-          </div>
-        </div>
-      `).join("")}
+        `).join("")}
+      </div>
       <button class="btn-primary" style="margin-top:12px;" onclick="Play.savePhase10()">Save Hand &amp; Continue</button>
     `;
   },
@@ -416,24 +500,26 @@ var Play = {
     const roundNum = game.hands.length + 1;
     return `
       <h3 style="margin-bottom:10px;">Round ${roundNum} <span class="pill">${roundNum} card${roundNum === 1 ? "" : "s"} dealt</span></h3>
-      ${game.units.map(u => `
-        <div class="entry-unit-block" data-unit="${u.id}">
-          <div class="unit-label">${escapeHtml(u.name)}</div>
-          <div class="toggle-row">
-            <span>Just type the total instead</span>
-            <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+        ${game.units.map(u => `
+          <div class="entry-unit-block" data-unit="${u.id}">
+            <div class="unit-label">${escapeHtml(u.name)}</div>
+            <div class="toggle-row">
+              <span>Just type the total instead</span>
+              <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+            </div>
+            <div class="structured-fields">
+              <div class="field-row"><label>Bid</label><input type="number" id="sk-bid-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
+              <div class="field-row"><label>Tricks won</label><input type="number" id="sk-tricks-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
+              <div class="field-row"><label>Bonus points</label><input type="number" id="sk-bonus-${u.id}" class="input-compact" placeholder="0" /></div>
+              <p class="hint-text">Bonus only counts if the bid above was exactly right.</p>
+            </div>
+            <div class="manual-fields hidden">
+              <input class="num-input" id="sk-manual-${u.id}" type="number" placeholder="0" />
+            </div>
           </div>
-          <div class="structured-fields">
-            <div class="field-row"><label>Bid</label><input type="number" id="sk-bid-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
-            <div class="field-row"><label>Tricks won</label><input type="number" id="sk-tricks-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
-            <div class="field-row"><label>Bonus points</label><input type="number" id="sk-bonus-${u.id}" class="input-compact" placeholder="0" /></div>
-            <p class="hint-text">Bonus only counts if the bid above was exactly right.</p>
-          </div>
-          <div class="manual-fields hidden">
-            <input class="num-input" id="sk-manual-${u.id}" type="number" placeholder="0" />
-          </div>
-        </div>
-      `).join("")}
+        `).join("")}
+      </div>
       <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveSkullKing()">Save Round &amp; Continue</button>
     `;
   },
@@ -441,23 +527,57 @@ var Play = {
   whoaCowboyForm(game) {
     return `
       <h3 style="margin-bottom:10px;">Enter this round</h3>
-      ${game.units.map(u => `
-        <div class="entry-unit-block" data-unit="${u.id}">
-          <div class="unit-label">${escapeHtml(u.name)}</div>
-          <div class="toggle-row">
-            <span>Just type the total instead</span>
-            <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+        ${game.units.map(u => `
+          <div class="entry-unit-block" data-unit="${u.id}">
+            <div class="unit-label">${escapeHtml(u.name)}</div>
+            <div class="toggle-row">
+              <span>Just type the total instead</span>
+              <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
+            </div>
+            <div class="structured-fields">
+              <div class="field-row"><label>Tokens (total points)</label><input type="number" class="wtc-tokens input-compact" placeholder="0" /></div>
+              <div class="field-row"><label>Cards left in hand</label><input type="number" class="wtc-left input-compact" min="0" placeholder="0" /></div>
+            </div>
+            <div class="manual-fields hidden">
+              <input class="num-input wtc-manual" type="number" placeholder="0" />
+            </div>
           </div>
-          <div class="structured-fields">
-            <div class="field-row"><label>Tokens (total points)</label><input type="number" class="wtc-tokens input-compact" placeholder="0" /></div>
-            <div class="field-row"><label>Cards left in hand</label><input type="number" class="wtc-left input-compact" min="0" placeholder="0" /></div>
-          </div>
-          <div class="manual-fields hidden">
-            <input class="num-input wtc-manual" type="number" placeholder="0" />
-          </div>
-        </div>
-      `).join("")}
+        `).join("")}
+      </div>
       <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveWhoaCowboy()">Save Round &amp; Continue</button>
+    `;
+  },
+
+  countdown321Form(game) {
+    const roundNum = game.hands.length + 1;
+    const firstUnitId = game.units[0].id;
+    return `
+      <h3 style="margin-bottom:10px;">Round ${roundNum}</h3>
+      <p class="hint-text" style="margin-bottom:6px;">How did this round end?</p>
+      <div class="segmented" id="c321-declType" data-selected="countdown">
+        <button type="button" class="on" onclick="Play.setCountdown321Type(this,'countdown')">Countdown!</button>
+        <button type="button" onclick="Play.setCountdown321Type(this,'blastoff')">Blastoff!</button>
+      </div>
+      <div class="field-row" style="margin-top:12px;">
+        <label>Declared by</label>
+        <select id="c321-declaredBy" onchange="Play.updateCountdown321Lock()">
+          ${game.units.map(u => `<option value="${u.id}" ${u.id === firstUnitId ? "selected" : ""}>${escapeHtml(u.name)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}" style="margin-top:12px;">
+        ${game.units.map(u => `
+          <div class="entry-unit-block" data-unit="${u.id}">
+            <div class="unit-label">${escapeHtml(u.name)}</div>
+            <div class="field-row">
+              <label>Hand total</label>
+              <input type="number" id="c321-total-${u.id}" class="input-compact c321-total" min="0" placeholder="0" />
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      <p class="hint-text" style="margin-top:8px;">The Blastoff declarer's hand total locks to 0 — their whole hand was discarded.</p>
+      <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveCountdown321()">Save Round &amp; Continue</button>
     `;
   },
 
@@ -495,6 +615,65 @@ var Play = {
     const on = el.classList.contains("on");
     document.getElementById("rookBidFields").classList.toggle("hidden", on);
     document.getElementById("rookManualFields").classList.toggle("hidden", !on);
+  },
+
+  setCountdown321Type(el, type) {
+    const container = document.getElementById("c321-declType");
+    container.querySelectorAll("button").forEach(b => b.classList.remove("on"));
+    el.classList.add("on");
+    container.dataset.selected = type;
+    this.updateCountdown321Lock();
+  },
+
+  // Locks the declared Blastoff player's hand-total input to 0 (their whole
+  // hand was discarded) and unlocks everyone else. Deliberately does NOT
+  // re-render the form — this only touches the DOM directly, so any hand
+  // totals already typed for other players survive toggling the
+  // declaration type or switching who declared.
+  updateCountdown321Lock() {
+    const type = document.getElementById("c321-declType").dataset.selected || "countdown";
+    const declaredById = document.getElementById("c321-declaredBy").value;
+    document.querySelectorAll(".c321-total").forEach(input => {
+      const unitId = input.id.replace("c321-total-", "");
+      if (type === "blastoff" && unitId === declaredById) {
+        input.value = "0";
+        input.disabled = true;
+      } else {
+        input.disabled = false;
+      }
+    });
+  },
+
+  clearCountdown321FieldErrors(game) {
+    game.units.forEach(u => this.clearFieldError(`c321-total-${u.id}`));
+  },
+
+  saveCountdown321() {
+    const game = App.state.game;
+    this.clearCountdown321FieldErrors(game);
+    const declarationType = document.getElementById("c321-declType").dataset.selected || "countdown";
+    const declaredById = document.getElementById("c321-declaredBy").value;
+
+    const rawEntries = {};
+    for (const u of game.units) {
+      const raw = document.getElementById(`c321-total-${u.id}`).value;
+      if (raw === "") { this.flagFieldError(`c321-total-${u.id}`, "*missing value"); return; }
+      const handTotal = Number(raw);
+      if (handTotal < 0) { this.flagFieldError(`c321-total-${u.id}`, "*Hand total can't be negative"); return; }
+      rawEntries[u.id] = { handTotal };
+    }
+
+    if (declarationType === "countdown" && rawEntries[declaredById].handTotal > 5) {
+      this.flagFieldError(`c321-total-${declaredById}`, "*'Countdown!' requires a hand total of 5 or less");
+      return;
+    }
+
+    const scores = Engine.countdown321(rawEntries, { declarationType, declaredById });
+    const entries = {};
+    game.units.forEach(u => {
+      entries[u.id] = { handTotal: rawEntries[u.id].handTotal, score: scores[u.id] };
+    });
+    this.commitHand(entries, { declarationType, declaredById });
   },
 
   saveSimple() {
@@ -1005,11 +1184,13 @@ var Play = {
     };
     Storage.addHistoryEntry(historyEntry);
     Storage.clearActiveGame();
+    Density.recordGameCompleted();
 
     App.state.game = null;
     App.state.lastFinishedGame = { ...game, standings };
     App.state.entryDraft = {};
     App.go("results");
+    Density.maybeShowIntroModal();
   },
 
   deleteHistoryEntry(id) {

@@ -99,7 +99,7 @@ var Screens = {
 
   // ---------- HOME ----------
   home() {
-    const players = Storage.getPlayers();
+    const players = Players.leaderboardOrder(Storage.getPlayers());
     const game = App.state.game;
     return `
       <div class="topbar">
@@ -374,6 +374,7 @@ var Screens = {
 
       <div class="card">
         <div class="stitch"></div>
+        ${!isWinLoss ? Density.toggleHtml() : ``}
         ${isWinLoss ? Play.winLossForm(game) : Play.scoreForm(game, entryType)}
       </div>
 

@@ -565,19 +565,70 @@ for (let i = 0; i < 5; i++) {
 assert(App.state.screen === "results", "Reign of Dragoness auto-ends after 5 rounds");
 assert(App.state.lastFinishedGame.winnerId === game.units[0].id, "highest cumulative score wins Reign of Dragoness");
 
-// 17. 3-2-1 Countdown — same shape, quick sanity check
+// 17. 3-2-1 Countdown — now has real tracking: declaration type, who
+// declared, and per-player hand totals, scored by Engine.countdown321.
 Setup.pick("countdown321");
 Setup.togglePlayer(players[0].id);
 Setup.togglePlayer(players[1].id);
+Setup.togglePlayer(players[2].id);
 Setup.start();
 game = App.state.game;
 assert(game.winMode === "high" && game.endCondition.value === 5, "3-2-1 Countdown set up as high-score, 5 fixed rounds");
-for (let i = 0; i < 5; i++) {
+
+function fillCountdown321(declType, declaredByIndex, totalsByIndex) {
   App.render();
-  if (App.state.screen !== "play") break;
-  fillSimple([4, 1]); // simulates a correct Countdown call (3 + 1 bonus) each round
+  const g = App.state.game;
+  const typeButtons = document.querySelectorAll("#c321-declType button");
+  Play.setCountdown321Type(typeButtons[declType === "countdown" ? 0 : 1], declType);
+  document.getElementById("c321-declaredBy").value = g.units[declaredByIndex].id;
+  Play.updateCountdown321Lock();
+  g.units.forEach((u, i) => {
+    const input = document.getElementById(`c321-total-${u.id}`);
+    if (!input.disabled) input.value = totalsByIndex[i];
+  });
+  Play.saveCountdown321();
 }
-assert(App.state.screen === "results", "3-2-1 Countdown auto-ends after 5 rounds");
+
+// Round 1: player 0 declares Countdown and truly has the sole lowest hand -> 3+1 bonus.
+fillCountdown321("countdown", 0, [2, 8, 6]);
+let lastHand = App.state.game.hands[App.state.game.hands.length - 1];
+assert(lastHand.entries[game.units[0].id].score === 4, "sole-lowest Countdown declarer scores 3+1 bonus");
+assert(lastHand.entries[game.units[1].id].score === 1, "third-lowest (8) scores 1");
+assert(lastHand.entries[game.units[2].id].score === 2, "second-lowest (6) scores 2");
+
+// Round 2: player 1 declares Countdown but is wrong (player 2 is actually lower) -> forfeits to 0.
+fillCountdown321("countdown", 1, [10, 5, 3]);
+lastHand = App.state.game.hands[App.state.game.hands.length - 1];
+assert(lastHand.entries[game.units[1].id].score === 0, "wrong Countdown declarer forfeits to 0, even though 5 would've been second-lowest");
+assert(lastHand.entries[game.units[2].id].score === 3, "the real lowest hand (3) still scores 3 normally");
+assert(lastHand.entries[game.units[0].id].score === 1, "hand of 10 is the third-lowest of these three distinct values, scoring 1 — not zeroed out just because the declarer next to it forfeited");
+
+// Round 3: player 0 and player 2 tie for lowest when player 0 declares Countdown -> no bonus, just 3.
+fillCountdown321("countdown", 0, [4, 9, 4]);
+lastHand = App.state.game.hands[App.state.game.hands.length - 1];
+assert(lastHand.entries[game.units[0].id].score === 3, "tied-for-lowest Countdown declarer gets normal 3, not the 4-point bonus");
+assert(lastHand.entries[game.units[2].id].score === 3, "the other player tied at the same low value also gets 3");
+assert(lastHand.entries[game.units[1].id].score === 2, "the lone higher hand (9) is the very next distinct value after the tied pair, so it's the second-lowest tier and scores 2 — the tie doesn't push it down to the third tier (1)");
+
+// Round 4: player 2 declares Blastoff — hand total forced to 0, flat 3, no bonus.
+fillCountdown321("blastoff", 2, [7, 5, 0]);
+lastHand = App.state.game.hands[App.state.game.hands.length - 1];
+assert(lastHand.entries[game.units[2].id].score === 3, "Blastoff declarer scores a flat 3, no +1 bonus");
+assert(lastHand.entries[game.units[2].id].handTotal === 0, "Blastoff declarer's hand total is locked to 0 in the saved entry");
+assert(lastHand.entries[game.units[1].id].score === 2, "remaining players still ranked normally for the second tier");
+assert(lastHand.entries[game.units[0].id].score === 1, "remaining players still ranked normally for the third tier");
+
+// Round 5: validation — declaring Countdown with a hand total over 5 should be rejected, not silently accepted.
+App.render();
+const typeButtons2 = document.querySelectorAll("#c321-declType button");
+Play.setCountdown321Type(typeButtons2[0], "countdown");
+document.getElementById("c321-declaredBy").value = game.units[0].id;
+Play.updateCountdown321Lock();
+game.units.forEach((u, i) => { document.getElementById(`c321-total-${u.id}`).value = [9, 2, 3][i]; });
+Play.saveCountdown321();
+assert(App.state.game.hands.length === 4, "declaring Countdown with a hand total over 5 is rejected — no 5th hand was recorded yet");
+fillCountdown321("countdown", 1, [9, 2, 3]);
+assert(App.state.screen === "results", "3-2-1 Countdown auto-ends after 5 valid rounds");
 
 // 18. Game ordering: alphabetical by default
 Storage.clearGameOrder();

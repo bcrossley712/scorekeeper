@@ -117,14 +117,15 @@ var DEFAULT_RULES = {
     label: "3-2-1 Countdown",
     winMode: "high",
     teamMode: "none",
-    entryType: "simple",
+    entryType: "countdown321",
     endCondition: { type: "hands", value: 5, allowChoice: true },
     info: [
-      "A card-shedding game — discard down toward the lowest hand value, or declare \"Countdown\" if you think you already have it.",
-      "5 fixed rounds. Each round, lowest hand value scores 3 points, second-lowest scores 2, third-lowest scores 1 — everyone else scores 0.",
-      "If you declared \"Countdown\" and truly had the lowest hand, add a +1 bonus (4 points that round). Declare it and you're wrong, and you score 0 instead of 3.",
-      "Highest cumulative score after 5 rounds wins.",
-      "The official rules break ties with one extra round among just the tied players — the app doesn't automate that part, so if it comes up, just play one more hand and compare manually.",
+      "A card-shedding game — discard down toward the lowest hand value. Every round ends when someone declares either \"Countdown!\" (hand totals 5 or less) or \"Blastoff!\" (entire hand is matching numbers, discarded all at once).",
+      "Base scoring each round: lowest hand total scores 3 points, second-lowest 2, third-lowest 1, everyone else 0. Ties share the same points — the next distinct value down still gets the next tier, it doesn't get skipped.",
+      "\"Countdown!\" declarer bonus/penalty: if they truly have the sole lowest hand, they get 3 + 1 bonus = 4. If they tie with someone else for lowest, it's just the normal 3 — no bonus for a tie. If anyone's hand total is actually lower than theirs, the declarer scores 0 for the round, even if their hand would otherwise have ranked second- or third-lowest — everyone else still scores off the real ranking as normal.",
+      "\"Blastoff!\" declarer: their hand is fully discarded, so they're guaranteed the lowest hand (0) and get a flat 3 points, no bonus. Everyone else is ranked normally among themselves for the second- and third-lowest tiers.",
+      "Highest cumulative score after 5 rounds wins. Ties are broken with one extra round among just the tied players — the app doesn't automate that part, so if it comes up, just play one more hand and compare manually.",
+      "Per the official rules, games with only 2 or 3 players use a different win condition entirely: first to win 3 individual rounds wins, rather than best cumulative score after 5. The app doesn't switch automatically for small groups — the default below is still 5 fixed rounds — so pick \"End on Cue\" at setup and stop after someone's 3rd round win if you're playing with 2 or 3.",
       "Default is 5 rounds, but you can switch to a longer fixed round count, a target score, or an open-ended \"End on Cue\" game at setup if your family wants to keep going."
     ]
   },

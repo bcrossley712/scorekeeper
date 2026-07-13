@@ -79,7 +79,23 @@ var Storage = {
   saveActiveGame(game) { return this._write(STORAGE_KEYS.active, game); },
   clearActiveGame() { localStorage.removeItem(STORAGE_KEYS.active); },
 
-  getSettings() { return this._read(STORAGE_KEYS.settings, { helpSeen: false }); },
+  getSettings() {
+    const DEFAULT_SETTINGS = {
+      helpSeen: false,
+      scoreEntryDensity: "comfortable", // "comfortable" (today's layout) or "compact" (tighter, more players per screen)
+      gamesCompletedCount: 0,           // only bumped by a real finish (a winner recorded) — never an abandoned game
+      densityIntroSeen: false,          // once true, the one-time "hey, layout changed" modal never shows again
+      showDensityIntroModal: false      // one-shot flag: true right after the auto-switch happens, consumed on next render
+    };
+    const s = this._read(STORAGE_KEYS.settings, null);
+    if (!s) {
+      this._write(STORAGE_KEYS.settings, DEFAULT_SETTINGS);
+      return DEFAULT_SETTINGS;
+    }
+    const merged = this._mergeMissing(s, DEFAULT_SETTINGS);
+    this._write(STORAGE_KEYS.settings, merged);
+    return merged;
+  },
   saveSettings(s) { return this._write(STORAGE_KEYS.settings, s); },
 
   getGameOrder() { return this._read(STORAGE_KEYS.gameOrder, null); },

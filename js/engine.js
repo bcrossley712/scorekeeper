@@ -62,6 +62,63 @@ var Engine = {
     return tokens - left;
   },
 
+  // 3-2-1 Countdown: entries = { unitId: { handTotal } } for every participant
+  // in the hand, handMeta = { declarationType: "countdown" | "blastoff", declaredById }.
+  // Unlike the other engine functions, this computes every participant's
+  // score in one shot — the ranking (and the declarer's bonus/penalty) is
+  // inherently comparative, not something that can be worked out per-player
+  // in isolation. Returns { unitId: score }.
+  //
+  // Base rule: lowest hand total = 3, second-lowest = 2, third-lowest = 1,
+  // everyone else 0. Ties share the same points and don't skip the next
+  // tier (dense ranking by distinct value, not by player count).
+  countdown321(entries, handMeta) {
+    const ids = Object.keys(entries);
+    const scores = {};
+    ids.forEach(id => (scores[id] = 0));
+
+    const rankByTiers = (idList, tierPoints) => {
+      const values = [...new Set(idList.map(id => entries[id].handTotal))].sort((a, b) => a - b);
+      idList.forEach(id => {
+        const tier = values.indexOf(entries[id].handTotal);
+        scores[id] = tier < tierPoints.length ? tierPoints[tier] : 0;
+      });
+    };
+
+    const declaredById = handMeta.declaredById;
+
+    if (handMeta.declarationType === "blastoff") {
+      // Declarer's hand is fully discarded — guaranteed lowest by
+      // definition, flat 3 points, no bonus. Everyone else is ranked
+      // normally among themselves for the second/third tiers.
+      scores[declaredById] = 3;
+      const rest = ids.filter(id => id !== declaredById);
+      rankByTiers(rest, [2, 1]);
+      return scores;
+    }
+
+    // Countdown declaration.
+    rankByTiers(ids, [3, 2, 1]);
+    const lowestTotal = Math.min(...ids.map(id => entries[id].handTotal));
+    const declarerTotal = entries[declaredById].handTotal;
+    const tiedForLowest = ids.filter(id => entries[id].handTotal === lowestTotal);
+
+    if (declarerTotal > lowestTotal) {
+      // Someone actually had a lower hand — the declarer forfeits their
+      // tier entirely, even if they'd have naturally landed 2nd or 3rd.
+      // Nobody else moves up to fill that slot; the real lowest/2nd/3rd
+      // (by hand value) keep whatever rankByTiers already gave them.
+      scores[declaredById] = 0;
+    } else if (tiedForLowest.length === 1) {
+      // Sole lowest — the +1 bonus on top of the normal 3.
+      scores[declaredById] = 4;
+    }
+    // else: declarer ties for lowest with someone else — the normal tier
+    // score (3) from rankByTiers stands as-is, no bonus.
+
+    return scores;
+  },
+
   computeHandScore(gameKey, entryType, entry, handMeta, participantId, rules) {
     switch (entryType) {
       case "handfoot": return this.handfoot(entry, rules);

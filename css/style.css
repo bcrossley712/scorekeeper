@@ -131,6 +131,40 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 
 .entry-unit-block{ background:var(--cream-dim); border-radius:10px; padding:12px; margin-bottom:12px; }
 .unit-label{ font-family:'Fraunces',serif; font-weight:600; font-size:15px; margin-bottom:8px; }
+
+/* Wraps each game's per-player entry-unit-blocks. Comfortable density keeps
+   today's single-column stack; compact just tightens spacing and lets wide
+   screens show more than one player at once. Both get the width breakpoints
+   below so nobody has to scroll through 8 players in a single column on a
+   tablet/desktop. minmax(0,1fr) — not plain 1fr — is required here or the
+   grid tracks blow past the card's width on narrow columns. */
+.entry-grid{ display:grid; grid-template-columns: minmax(0,1fr); gap:12px; margin-bottom:12px; }
+.entry-grid .entry-unit-block{ margin-bottom:0; }
+@media (min-width:760px){ .entry-grid{ grid-template-columns: minmax(0,1fr) minmax(0,1fr); } }
+@media (min-width:1040px){ .entry-grid{ grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); } }
+
+.entry-grid.is-compact{ gap:8px; }
+.entry-grid.is-compact .entry-unit-block{ padding:9px 10px; }
+.entry-grid.is-compact .unit-label{ font-size:13.5px; margin-bottom:4px; }
+.entry-grid.is-compact .toggle-row{ padding:0; background:none; margin-bottom:6px; }
+.entry-grid.is-compact .toggle-row span{ display:none; }
+.entry-grid.is-compact .toggle-row::before{ content:"Manual total \22EF"; font-size:10.5px; font-weight:800; letter-spacing:.3px; text-transform:uppercase; color:#a89b82; margin-right:auto; }
+.entry-grid.is-compact .switch{ width:30px; height:18px; }
+.entry-grid.is-compact .switch .knob{ width:12px; height:12px; top:3px; left:3px; }
+.entry-grid.is-compact .switch.on .knob{ left:15px; }
+.entry-grid.is-compact .field-row{ margin-bottom:5px; gap:6px; }
+.entry-grid.is-compact .field-row label{ font-size:12px; }
+.entry-grid.is-compact .field-row input, .entry-grid.is-compact .field-row select{ padding:6px 8px; font-size:13px; }
+.entry-grid.is-compact .field-row input.input-compact{ width:4.5rem; }
+.entry-grid.is-compact .hint-text{ display:none; }
+.entry-grid.is-compact .cardqty-row{ padding:6px 8px; }
+
+/* Quiet toggle at the top of each entry screen — deliberately away from the
+   player list and Save button so it can't be hit by accident. No confirm
+   step; switching density isn't destructive, it's just a layout choice. */
+.density-toggle-quiet{ display:flex; justify-content:flex-end; margin-bottom:8px; }
+.density-quiet-btn{ background:none; border:none; color:#a89b82; font-size:11.5px; font-weight:700; letter-spacing:.2px; cursor:pointer; padding:4px 2px; text-decoration:underline; text-decoration-color:transparent; transition:text-decoration-color .15s; }
+.density-quiet-btn:hover{ text-decoration-color:#a89b82; }
 .hidden{ display:none !important; }
 
 .winloss-pick{ display:flex; align-items:center; gap:10px; padding:12px; border-radius:10px; border:2px solid transparent; margin-bottom:8px; cursor:pointer; background:var(--cream-dim); }
