@@ -171,9 +171,9 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 .entry-grid.is-compact{ gap:8px; }
 .entry-grid.is-compact .entry-unit-block{ padding:9px 10px; }
 .entry-grid.is-compact .unit-label{ font-size:13.5px; margin-bottom:4px; }
-.entry-grid.is-compact .toggle-row{ padding:0; background:none; margin-bottom:6px; }
-.entry-grid.is-compact .toggle-row span{ display:none; }
-.entry-grid.is-compact .toggle-row::before{ content:"\22EF"; font-size:16px; font-weight:800; color:#a89b82; margin-right:auto; }
+.entry-grid.is-compact .toggle-row{ padding:0; background:none; margin-bottom:6px; gap:6px; }
+.entry-grid.is-compact .toggle-label-full{ display:none; }
+.entry-grid.is-compact .toggle-label-short{ display:inline; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:#a89b82; margin-right:auto; }
 .entry-grid.is-compact .switch{ width:30px; height:18px; }
 .entry-grid.is-compact .switch .knob{ width:12px; height:12px; top:3px; left:3px; }
 .entry-grid.is-compact .switch.on .knob{ left:15px; }
@@ -219,9 +219,20 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 }
 .entry-grid.is-compact.inline-fields .check-inline{ font-size:12px; gap:5px; }
 .entry-grid.is-compact.inline-fields .check-inline input[type="checkbox"]{ width:16px; height:16px; }
+/* The sandbox's manual-override control was a single small "⋯" button —
+   no separate switch widget alongside it. Match that here: hide the label
+   entirely and strip the switch down to just the glyph, no track/knob. */
 .entry-grid.is-compact.inline-fields .toggle-row{
   order:99; flex:0 0 auto; margin-bottom:0; gap:0;
 }
+.entry-grid.is-compact.inline-fields .toggle-label-full,
+.entry-grid.is-compact.inline-fields .toggle-label-short{ display:none; }
+.entry-grid.is-compact.inline-fields .switch{
+  width:auto; height:auto; background:none; border-radius:0;
+  padding:4px 2px; position:relative;
+}
+.entry-grid.is-compact.inline-fields .switch::before{ content:"\22EF"; font-size:18px; font-weight:800; color:#a89b82; line-height:1; }
+.entry-grid.is-compact.inline-fields .switch .knob{ display:none; }
 .entry-grid.is-compact.inline-fields .manual-fields{ flex:0 0 auto; }
 .entry-grid.is-compact.inline-fields .manual-fields input{ width:4.5rem; padding:6px 8px; font-size:13px; }
 /* Simple games (bare "num-input", no field-row wrapper at all) still need

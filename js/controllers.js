@@ -388,7 +388,8 @@ var Play = {
           <div class="entry-unit-block" data-unit="${u.id}">
             ${this.unitLabelHtml(escapeHtml(u.name), true)}
             <div class="toggle-row">
-              <span>Just type the total instead</span>
+              <span class="toggle-label-full">Just type the total instead</span>
+              <span class="toggle-label-short">Manual</span>
               <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
             </div>
             <div class="structured-fields">
@@ -466,11 +467,13 @@ var Play = {
           <div class="entry-unit-block" data-unit="${u.id}">
             ${this.unitLabelHtml(`${escapeHtml(u.name)} <span class="pill">${phases[u.id] > 10 ? "Complete!" : "Phase " + phases[u.id]}</span>`, true)}
             <div class="toggle-row">
-              <span>Completed this phase</span>
+              <span class="toggle-label-full">Completed this phase</span>
+              <span class="toggle-label-short">Done</span>
               <div class="switch phase-complete-switch" onclick="Play.toggleManualSwitch(this,true)"><div class="knob"></div></div>
             </div>
             <div class="toggle-row">
-              <span>Just type the total instead</span>
+              <span class="toggle-label-full">Just type the total instead</span>
+              <span class="toggle-label-short">Manual</span>
               <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
             </div>
             <div class="structured-fields">
@@ -505,13 +508,13 @@ var Play = {
           <div class="entry-unit-block" data-unit="${u.id}">
             ${this.unitLabelHtml(escapeHtml(u.name), Density.get() !== "compact")}
             <div class="toggle-row">
-              <span>Just type the total instead</span>
+              <span class="toggle-label-full">Just type the total instead</span>
               <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
             </div>
             <div class="structured-fields">
-              <div class="field-row"><label>Bid</label><input type="number" id="sk-bid-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
-              <div class="field-row"><label>Tricks won</label><input type="number" id="sk-tricks-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
-              <div class="field-row"><label>Bonus points</label><input type="number" id="sk-bonus-${u.id}" class="input-compact" placeholder="0" /></div>
+              <div class="field-row"><label>${this.fieldLabelText("Bid", "Bid")}</label><input type="number" id="sk-bid-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
+              <div class="field-row"><label>${this.fieldLabelText("Tricks won", "Won")}</label><input type="number" id="sk-tricks-${u.id}" class="input-compact" min="0" max="${roundNum}" placeholder="0-${roundNum}" /></div>
+              <div class="field-row"><label>${this.fieldLabelText("Bonus points", "Bonus")}</label><input type="number" id="sk-bonus-${u.id}" class="input-compact" placeholder="0" /></div>
               <p class="hint-text">Bonus only counts if the bid above was exactly right.</p>
             </div>
             <div class="manual-fields hidden">
@@ -532,12 +535,12 @@ var Play = {
           <div class="entry-unit-block" data-unit="${u.id}">
             ${this.unitLabelHtml(escapeHtml(u.name), Density.get() !== "compact")}
             <div class="toggle-row">
-              <span>Just type the total instead</span>
+              <span class="toggle-label-full">Just type the total instead</span>
               <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
             </div>
             <div class="structured-fields">
-              <div class="field-row"><label>Tokens (total points)</label><input type="number" class="wtc-tokens input-compact" placeholder="0" /></div>
-              <div class="field-row"><label>Cards left in hand</label><input type="number" class="wtc-left input-compact" min="0" placeholder="0" /></div>
+              <div class="field-row"><label>${this.fieldLabelText("Tokens (total points)", "Tokens")}</label><input type="number" class="wtc-tokens input-compact" placeholder="0" /></div>
+              <div class="field-row"><label>${this.fieldLabelText("Cards left in hand", "Left")}</label><input type="number" class="wtc-left input-compact" min="0" placeholder="0" /></div>
             </div>
             <div class="manual-fields hidden">
               <input class="num-input wtc-manual" type="number" placeholder="0" />
@@ -617,6 +620,14 @@ var Play = {
   // no re-render, so nothing typed into other players' fields is lost.
   toggleCollapse(el) {
     el.closest(".entry-unit-block").classList.toggle("collapsed");
+  },
+
+  // Short field labels for the inline-eligible games' compact rows — a
+  // mini-label like "Won" reads fine sitting right above a tiny input, but
+  // "Tricks won" or "Bonus points" at that size either wraps or blows the
+  // row width out. Comfortable always gets the full, spelled-out label.
+  fieldLabelText(full, short) {
+    return Density.get() === "compact" ? short : full;
   },
 
   toggleManualSwitch(el, isPhaseComplete) {
