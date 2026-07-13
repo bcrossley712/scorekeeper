@@ -132,6 +132,17 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 .entry-unit-block{ background:var(--cream-dim); border-radius:10px; padding:12px; margin-bottom:12px; }
 .unit-label{ font-family:'Fraunces',serif; font-weight:600; font-size:15px; margin-bottom:8px; }
 
+/* Collapsible player cards. Only rendered (see Play.unitLabelHtml) where a
+   card is still in stacked form — Comfortable everywhere, and Compact for
+   Hand & Foot / Phase 10, which never inline. Collapsing shows the bare
+   name only, nothing else — no total, no partial entries peeking through. */
+.unit-label-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.unit-label-row .unit-label{ margin-bottom:0; }
+.collapse-toggle{ background:none; border:none; color:#928873; font-size:15px; padding:4px 8px; margin:-4px -6px; cursor:pointer; line-height:1; flex-shrink:0; transition:transform .15s ease; }
+.entry-unit-block.collapsed .collapse-toggle{ transform:rotate(-90deg); }
+.entry-unit-block.collapsed > *:not(.unit-label-row){ display:none; }
+.entry-grid.is-compact .unit-label-row{ margin-bottom:4px; }
+
 /* Wraps each game's per-player entry-unit-blocks. Comfortable density keeps
    today's single-column stack; compact just tightens spacing and lets wide
    screens show more than one player at once. Both get the width breakpoints
@@ -143,12 +154,26 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 @media (min-width:760px){ .entry-grid{ grid-template-columns: minmax(0,1fr) minmax(0,1fr); } }
 @media (min-width:1040px){ .entry-grid{ grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); } }
 
+/* 3-2-1 Countdown's per-player declaration checkboxes + total. Comfortable
+   stacks them (column direction, each on its own line, same rhythm as every
+   other game's field-rows). Compact — see .inline-fields below — lays them
+   out inline instead, on the same row as the player's name. */
+.c321-fields{ display:flex; flex-direction:column; gap:8px; }
+.check-inline{ display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:700; color:#5c5348; cursor:pointer; }
+.check-inline input[type="checkbox"]{ width:19px; height:19px; accent-color:var(--pip); cursor:pointer; flex-shrink:0; }
+.c321-total-row{ margin-bottom:0; }
+
+/* Base compact tightening — applies to every game (padding/font shrink,
+   collapsed toggle-row, hidden hint text). This alone is what Hand & Foot
+   and Phase 10 use: too many fields (5, or 2 toggles + 4 steppers) to
+   sensibly cram into one row, so they just get denser spacing while
+   staying stacked exactly like Comfortable. */
 .entry-grid.is-compact{ gap:8px; }
 .entry-grid.is-compact .entry-unit-block{ padding:9px 10px; }
 .entry-grid.is-compact .unit-label{ font-size:13.5px; margin-bottom:4px; }
 .entry-grid.is-compact .toggle-row{ padding:0; background:none; margin-bottom:6px; }
 .entry-grid.is-compact .toggle-row span{ display:none; }
-.entry-grid.is-compact .toggle-row::before{ content:"Manual total \22EF"; font-size:10.5px; font-weight:800; letter-spacing:.3px; text-transform:uppercase; color:#a89b82; margin-right:auto; }
+.entry-grid.is-compact .toggle-row::before{ content:"\22EF"; font-size:16px; font-weight:800; color:#a89b82; margin-right:auto; }
 .entry-grid.is-compact .switch{ width:30px; height:18px; }
 .entry-grid.is-compact .switch .knob{ width:12px; height:12px; top:3px; left:3px; }
 .entry-grid.is-compact .switch.on .knob{ left:15px; }
@@ -158,6 +183,52 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 .entry-grid.is-compact .field-row input.input-compact{ width:4.5rem; }
 .entry-grid.is-compact .hint-text{ display:none; }
 .entry-grid.is-compact .cardqty-row{ padding:6px 8px; }
+
+/* True single-row inline compact — the sandbox's Skull King layout, now for
+   real. Only forms tagged .inline-fields opt in: Simple (Gnoming, Reign of
+   Dragoness, Custom Game), Skull King, Whoa There Cowboy, and 3-2-1
+   Countdown — every game with 3 or fewer short fields per player. Hand &
+   Foot and Phase 10 deliberately don't get this class; they stay on the
+   tighten-only rules above.
+   The trick: .entry-unit-block itself becomes the flex row (name included,
+   not a separate line above it), and any wrapper div that exists purely to
+   group fields (.structured-fields, .c321-fields) switches to
+   `display:contents` so its children join that same flex row directly,
+   instead of staying nested as one block-level item. */
+.entry-grid.is-compact.inline-fields .entry-unit-block{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
+}
+.entry-grid.is-compact.inline-fields .unit-label{
+  flex:1 1 auto; min-width:44px; margin-bottom:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.entry-grid.is-compact.inline-fields .structured-fields,
+.entry-grid.is-compact.inline-fields .c321-fields{
+  display:contents;
+}
+.entry-grid.is-compact.inline-fields .field-row{
+  display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  margin-bottom:0; flex:0 0 auto;
+}
+.entry-grid.is-compact.inline-fields .field-row label{
+  font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:#928873;
+}
+.entry-grid.is-compact.inline-fields .field-row input,
+.entry-grid.is-compact.inline-fields .field-row select{
+  width:3.6rem; padding:6px 4px; font-size:13px; text-align:center;
+}
+.entry-grid.is-compact.inline-fields .check-inline{ font-size:12px; gap:5px; }
+.entry-grid.is-compact.inline-fields .check-inline input[type="checkbox"]{ width:16px; height:16px; }
+.entry-grid.is-compact.inline-fields .toggle-row{
+  order:99; flex:0 0 auto; margin-bottom:0; gap:0;
+}
+.entry-grid.is-compact.inline-fields .manual-fields{ flex:0 0 auto; }
+.entry-grid.is-compact.inline-fields .manual-fields input{ width:4.5rem; padding:6px 8px; font-size:13px; }
+/* Simple games (bare "num-input", no field-row wrapper at all) still need
+   to shrink from full-width down to a normal inline field size. */
+.entry-grid.is-compact.inline-fields .entry-unit-block > input.num-input{
+  width:4.5rem; padding:8px 6px; font-size:14px; flex:0 0 auto;
+}
 
 /* Quiet toggle at the top of each entry screen — deliberately away from the
    player list and Save button so it can't be hit by accident. No confirm

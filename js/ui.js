@@ -80,5 +80,41 @@ var UI = {
     banner.innerHTML = `<span>A new version is ready.</span><button id="updateBannerBtn">Refresh</button>`;
     document.body.appendChild(banner);
     document.getElementById("updateBannerBtn").onclick = () => window.location.reload();
+  },
+
+  // Enter moves focus to the next score-entry field instead of doing
+  // nothing (the previous behavior) or submitting anything. Deliberately
+  // scoped to `.entry-grid` only — player-name fields and the guest-name
+  // prompt already have their own explicit Enter-to-submit handlers, and
+  // this must never overlap with those or with the actual Save button.
+  //
+  // On the very last field, Enter just blurs (closes the keyboard) rather
+  // than advancing to — or clicking — Save. That's intentional: this
+  // screen exists specifically to avoid an Enter press ever submitting a
+  // round of unfinished data, so the last step always has to be an actual
+  // tap on Save.
+  //
+  // One delegated listener registered once at boot (see App.init), not
+  // re-attached per render, since score entry forms are rebuilt from
+  // scratch on every render.
+  enableEnterNavigation() {
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const field = e.target;
+      if (!field.matches(".entry-grid input, .entry-grid select")) return;
+      if (field.type === "checkbox") return; // checkboxes are tapped, not typed into — leave native behavior alone
+
+      const grid = field.closest(".entry-grid");
+      const candidates = Array.from(grid.querySelectorAll("input, select")).filter(el => {
+        if (el.type === "checkbox" || el.disabled || el.closest(".hidden")) return false;
+        const block = el.closest(".entry-unit-block");
+        return !block || !block.classList.contains("collapsed");
+      });
+      const i = candidates.indexOf(field);
+      e.preventDefault();
+      if (i === -1) return;
+      const next = candidates[i + 1];
+      if (next) next.focus(); else field.blur();
+    });
   }
 };

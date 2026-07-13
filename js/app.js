@@ -24,6 +24,7 @@ var App = {
       history.replaceState(this._historySnapshot(), "");
     }
     window.addEventListener("popstate", (e) => this._onPopState(e));
+    UI.enableEnterNavigation();
     this.render();
   },
 

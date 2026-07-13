@@ -27,7 +27,7 @@ load("js/ui.js");
 load("js/controllers.js");
 load("js/app.js");
 
-const { App, Storage, Players, Setup, Play, RulesEdit, Screens, Engine, UI, DEFAULT_RULES, GameOrder, GAME_ORDER } = dom.window;
+const { App, Storage, Players, Setup, Play, RulesEdit, Screens, Engine, UI, Density, DEFAULT_RULES, GameOrder, GAME_ORDER } = dom.window;
 
 function assert(cond, msg) {
   if (!cond) throw new Error("FAIL: " + msg);
@@ -578,10 +578,9 @@ assert(game.winMode === "high" && game.endCondition.value === 5, "3-2-1 Countdow
 function fillCountdown321(declType, declaredByIndex, totalsByIndex) {
   App.render();
   const g = App.state.game;
-  const typeButtons = document.querySelectorAll("#c321-declType button");
-  Play.setCountdown321Type(typeButtons[declType === "countdown" ? 0 : 1], declType);
-  document.getElementById("c321-declaredBy").value = g.units[declaredByIndex].id;
-  Play.updateCountdown321Lock();
+  const cb = document.getElementById(`c321-declare-${declType}-${g.units[declaredByIndex].id}`);
+  cb.checked = true;
+  Play.setCountdown321Declaration(cb);
   g.units.forEach((u, i) => {
     const input = document.getElementById(`c321-total-${u.id}`);
     if (!input.disabled) input.value = totalsByIndex[i];
@@ -618,12 +617,34 @@ assert(lastHand.entries[game.units[2].id].handTotal === 0, "Blastoff declarer's 
 assert(lastHand.entries[game.units[1].id].score === 2, "remaining players still ranked normally for the second tier");
 assert(lastHand.entries[game.units[0].id].score === 1, "remaining players still ranked normally for the third tier");
 
+// Checkbox exclusivity: checking one player's Countdown box should disable
+// every other declaration checkbox (any player, any type) AND the other
+// checkbox on that same player — only one person can declare per round.
+App.render();
+game = App.state.game;
+const cdBox0 = document.getElementById(`c321-declare-countdown-${game.units[0].id}`);
+cdBox0.checked = true;
+Play.setCountdown321Declaration(cdBox0);
+assert(document.getElementById(`c321-declare-blastoff-${game.units[0].id}`).disabled === true, "the same player's other checkbox (Blastoff) disables once Countdown is checked");
+assert(document.getElementById(`c321-declare-countdown-${game.units[1].id}`).disabled === true, "another player's Countdown checkbox disables once someone else has declared");
+assert(document.getElementById(`c321-declare-blastoff-${game.units[1].id}`).disabled === true, "another player's Blastoff checkbox disables once someone else has declared");
+assert(document.getElementById(`c321-total-${game.units[0].id}`).disabled === false, "Countdown (not Blastoff) leaves the declarer's own total field editable");
+// Unchecking re-enables everything.
+cdBox0.checked = false;
+Play.setCountdown321Declaration(cdBox0);
+assert(document.getElementById(`c321-declare-blastoff-${game.units[0].id}`).disabled === false, "unchecking the declaration re-enables the same player's other checkbox");
+assert(document.getElementById(`c321-declare-countdown-${game.units[1].id}`).disabled === false, "unchecking the declaration re-enables other players' checkboxes too");
+
+// Validation: saving with nobody checked should be rejected, not silently guessed.
+game.units.forEach((u, i) => { document.getElementById(`c321-total-${u.id}`).value = [4, 9, 4][i]; });
+Play.saveCountdown321();
+assert(App.state.game.hands.length === 4, "saving with no declaration checkbox checked is rejected — no 5th hand was recorded yet");
+
 // Round 5: validation — declaring Countdown with a hand total over 5 should be rejected, not silently accepted.
 App.render();
-const typeButtons2 = document.querySelectorAll("#c321-declType button");
-Play.setCountdown321Type(typeButtons2[0], "countdown");
-document.getElementById("c321-declaredBy").value = game.units[0].id;
-Play.updateCountdown321Lock();
+const cdBox0b = document.getElementById(`c321-declare-countdown-${game.units[0].id}`);
+cdBox0b.checked = true;
+Play.setCountdown321Declaration(cdBox0b);
 game.units.forEach((u, i) => { document.getElementById(`c321-total-${u.id}`).value = [9, 2, 3][i]; });
 Play.saveCountdown321();
 assert(App.state.game.hands.length === 4, "declaring Countdown with a hand total over 5 is rejected — no 5th hand was recorded yet");
@@ -1016,6 +1037,119 @@ Play.undoLastFromResults();
 clickModalConfirm();
 assert(App.state.screen === "play", "Undo Last Hand from Results works for a normal scoring game too, not just win/loss games");
 assert(App.state.game.hands.length === 2, "only the final hand that triggered the finish was removed, the other 2 remain");
+Play.abandonGame();
+
+// 38. Enter-to-next-field in score entry — never a submit, scoped only to
+// .entry-grid inputs, skips disabled/hidden fields, and blurs (doesn't
+// submit) on the very last field.
+UI.enableEnterNavigation();
+function pressEnter(el) {
+  el.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+}
+Setup.pick("skullking");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+App.render();
+game = App.state.game;
+let bidField = document.getElementById(`sk-bid-${game.units[0].id}`);
+bidField.focus();
+pressEnter(bidField);
+assert(document.activeElement.id === `sk-tricks-${game.units[0].id}`, "Enter on Bid moves focus to Tricks, same player");
+pressEnter(document.activeElement);
+assert(document.activeElement.id === `sk-bonus-${game.units[0].id}`, "Enter on Tricks moves focus to Bonus, same player");
+pressEnter(document.activeElement);
+assert(document.activeElement.id === `sk-bid-${game.units[1].id}`, "Enter on the last field of player 1 moves to the first field of player 2, not off the form");
+assert(App.state.game.hands.length === 0, "Enter navigation never submitted the round — no hand was recorded just from pressing Enter");
+
+// Last field overall: Enter should blur, not submit and not error.
+pressEnter(document.getElementById(`sk-tricks-${game.units[1].id}`));
+let lastField = document.getElementById(`sk-bonus-${game.units[1].id}`);
+lastField.focus();
+pressEnter(lastField);
+assert(App.state.game.hands.length === 0, "Enter on the very last field of the whole form still doesn't submit anything");
+
+// Manual-override field is skipped while hidden, included once shown.
+let manualToggle = document.querySelector(`.entry-unit-block[data-unit="${game.units[0].id}"] .switch`);
+Play.toggleManualSwitch(manualToggle);
+let manualInput = document.querySelector(`.entry-unit-block[data-unit="${game.units[0].id}"] .manual-fields input`);
+assert(manualInput.closest(".hidden") === null, "manual override field is now visible after toggling");
+let p1Bonus = document.getElementById(`sk-bonus-${game.units[0].id}`);
+assert(p1Bonus.closest(".hidden") !== null, "the structured Bonus field is now hidden, since manual override is on");
+manualInput.focus();
+pressEnter(manualInput);
+assert(document.activeElement.id === `sk-bid-${game.units[1].id}`, "Enter from the now-visible manual field skips the now-hidden structured fields entirely, landing on the next player");
+Play.toggleManualSwitch(manualToggle); // revert before the game gets abandoned, tidy state
+Play.abandonGame();
+
+// Enter outside any .entry-grid (e.g. the player-name field) is untouched —
+// its own explicit handler still owns Enter there.
+App.go("players");
+App.render();
+let nameField = document.getElementById("newPlayerName");
+nameField.value = "Zeke";
+nameField.focus();
+pressEnter(nameField);
+assert(Storage.getPlayers().some(p => p.name === "Zeke"), "Enter on the new-player name field still adds the player, unaffected by the new score-entry handler");
+
+// 39. Collapsible player cards — only where a card is still stacked.
+// Comfortable: every game gets the chevron. Compact: only Hand & Foot and
+// Phase 10 (which never inline) get it; the inline-eligible games don't,
+// since there's nothing left to collapse on an already-single-row card.
+Density.set("comfortable");
+Setup.pick("skullking");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+App.render();
+game = App.state.game;
+assert(document.querySelector(".collapse-toggle") !== null, "Comfortable Skull King shows the collapse chevron");
+Play.abandonGame();
+
+Density.set("compact");
+Setup.pick("skullking");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+App.render();
+assert(document.querySelector(".collapse-toggle") === null, "Compact Skull King (already single-row) shows no collapse chevron");
+Play.abandonGame();
+
+Setup.pick("handfoot");
+Setup.togglePlayer(players[0].id);
+Setup.togglePlayer(players[1].id);
+Setup.start();
+App.render();
+game = App.state.game;
+assert(document.querySelector(".collapse-toggle") !== null, "Compact Hand & Foot still shows the collapse chevron — it never inlines regardless of density");
+
+// Collapsing actually hides the fields, and shows the bare name only.
+const chevron = document.querySelector(".collapse-toggle");
+const block = chevron.closest(".entry-unit-block");
+const p0Id = block.dataset.unit;
+const p1Id = game.units.find(u => u.id !== p0Id).id;
+assert(!block.classList.contains("collapsed"), "player card starts expanded");
+Play.toggleCollapse(chevron);
+assert(block.classList.contains("collapsed"), "collapsing sets the collapsed class");
+assert(block.querySelector(".unit-label-row") !== null, "the name row itself is never hidden");
+
+// Enter-navigation must skip fields inside a collapsed card entirely,
+// rather than trying (and silently failing) to focus a hidden field.
+const p1Block = document.querySelector(`.entry-unit-block[data-unit="${p1Id}"]`);
+const p1CleanField = p1Block.querySelector(".hf-clean");
+p1CleanField.focus();
+pressEnter(p1CleanField);
+assert(document.activeElement.closest(".entry-unit-block") === p1Block, "Enter from the collapsed player's neighbor stays within the expanded player's own fields");
+// Walk through the rest of player 1's fields — none of these Enters should
+// ever land inside player 0's collapsed card.
+["hf-dirty", "hf-meld", "hf-bonus", "hf-stuck"].forEach(cls => {
+  pressEnter(document.activeElement);
+  const landedBlock = document.activeElement.closest(".entry-unit-block");
+  assert(landedBlock === null || landedBlock === p1Block, `Enter never lands inside the collapsed card while advancing through ${cls}`);
+});
+
+Play.toggleCollapse(chevron);
+assert(!block.classList.contains("collapsed"), "toggling again re-expands the card");
 Play.abandonGame();
 
 console.log("\\nALL SMOKE TESTS PASSED");

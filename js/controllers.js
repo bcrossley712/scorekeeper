@@ -368,10 +368,10 @@ var Play = {
   simpleForm(game) {
     return `
       <h3 style="margin-bottom:10px;">Enter hand totals</h3>
-      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact inline-fields" : ""}">
         ${game.units.map(u => `
           <div class="entry-unit-block" data-unit="${u.id}">
-            <div class="unit-label">${escapeHtml(u.name)}</div>
+            ${this.unitLabelHtml(escapeHtml(u.name), Density.get() !== "compact")}
             <input class="num-input simple-total" type="number" placeholder="0" />
           </div>
         `).join("")}
@@ -386,7 +386,7 @@ var Play = {
       <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
         ${game.units.map(u => `
           <div class="entry-unit-block" data-unit="${u.id}">
-            <div class="unit-label">${escapeHtml(u.name)}</div>
+            ${this.unitLabelHtml(escapeHtml(u.name), true)}
             <div class="toggle-row">
               <span>Just type the total instead</span>
               <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
@@ -464,7 +464,7 @@ var Play = {
       <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
         ${game.units.map(u => `
           <div class="entry-unit-block" data-unit="${u.id}">
-            <div class="unit-label">${escapeHtml(u.name)} <span class="pill">${phases[u.id] > 10 ? "Complete!" : "Phase " + phases[u.id]}</span></div>
+            ${this.unitLabelHtml(`${escapeHtml(u.name)} <span class="pill">${phases[u.id] > 10 ? "Complete!" : "Phase " + phases[u.id]}</span>`, true)}
             <div class="toggle-row">
               <span>Completed this phase</span>
               <div class="switch phase-complete-switch" onclick="Play.toggleManualSwitch(this,true)"><div class="knob"></div></div>
@@ -500,10 +500,10 @@ var Play = {
     const roundNum = game.hands.length + 1;
     return `
       <h3 style="margin-bottom:10px;">Round ${roundNum} <span class="pill">${roundNum} card${roundNum === 1 ? "" : "s"} dealt</span></h3>
-      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact inline-fields" : ""}">
         ${game.units.map(u => `
           <div class="entry-unit-block" data-unit="${u.id}">
-            <div class="unit-label">${escapeHtml(u.name)}</div>
+            ${this.unitLabelHtml(escapeHtml(u.name), Density.get() !== "compact")}
             <div class="toggle-row">
               <span>Just type the total instead</span>
               <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
@@ -527,10 +527,10 @@ var Play = {
   whoaCowboyForm(game) {
     return `
       <h3 style="margin-bottom:10px;">Enter this round</h3>
-      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}">
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact inline-fields" : ""}">
         ${game.units.map(u => `
           <div class="entry-unit-block" data-unit="${u.id}">
-            <div class="unit-label">${escapeHtml(u.name)}</div>
+            ${this.unitLabelHtml(escapeHtml(u.name), Density.get() !== "compact")}
             <div class="toggle-row">
               <span>Just type the total instead</span>
               <div class="switch" onclick="Play.toggleManualSwitch(this)"><div class="knob"></div></div>
@@ -551,32 +551,30 @@ var Play = {
 
   countdown321Form(game) {
     const roundNum = game.hands.length + 1;
-    const firstUnitId = game.units[0].id;
     return `
       <h3 style="margin-bottom:10px;">Round ${roundNum}</h3>
-      <p class="hint-text" style="margin-bottom:6px;">How did this round end?</p>
-      <div class="segmented" id="c321-declType" data-selected="countdown">
-        <button type="button" class="on" onclick="Play.setCountdown321Type(this,'countdown')">Countdown!</button>
-        <button type="button" onclick="Play.setCountdown321Type(this,'blastoff')">Blastoff!</button>
-      </div>
-      <div class="field-row" style="margin-top:12px;">
-        <label>Declared by</label>
-        <select id="c321-declaredBy" onchange="Play.updateCountdown321Lock()">
-          ${game.units.map(u => `<option value="${u.id}" ${u.id === firstUnitId ? "selected" : ""}>${escapeHtml(u.name)}</option>`).join("")}
-        </select>
-      </div>
-      <div class="entry-grid ${Density.get() === "compact" ? "is-compact" : ""}" style="margin-top:12px;">
+      <div class="entry-grid ${Density.get() === "compact" ? "is-compact inline-fields" : ""}">
         ${game.units.map(u => `
           <div class="entry-unit-block" data-unit="${u.id}">
-            <div class="unit-label">${escapeHtml(u.name)}</div>
-            <div class="field-row">
-              <label>Hand total</label>
-              <input type="number" id="c321-total-${u.id}" class="input-compact c321-total" min="0" placeholder="0" />
+            ${this.unitLabelHtml(escapeHtml(u.name), Density.get() !== "compact")}
+            <div class="c321-fields">
+              <label class="check-inline">
+                <input type="checkbox" id="c321-declare-countdown-${u.id}" class="c321-declare-cb" data-unit="${u.id}" data-type="countdown" onchange="Play.setCountdown321Declaration(this)" />
+                <span>Countdown!</span>
+              </label>
+              <label class="check-inline">
+                <input type="checkbox" id="c321-declare-blastoff-${u.id}" class="c321-declare-cb" data-unit="${u.id}" data-type="blastoff" onchange="Play.setCountdown321Declaration(this)" />
+                <span>Blastoff!</span>
+              </label>
+              <div class="field-row c321-total-row">
+                <label>Total</label>
+                <input type="number" id="c321-total-${u.id}" class="input-compact c321-total" min="0" placeholder="0" />
+              </div>
             </div>
           </div>
         `).join("")}
       </div>
-      <p class="hint-text" style="margin-top:8px;">The Blastoff declarer's hand total locks to 0 — their whole hand was discarded.</p>
+      <p class="hint-text" style="margin-top:8px;">Check who declared Countdown or Blastoff — checking one disables it for everyone else, since only one player can declare per round. The Blastoff player's total locks to 0 automatically.</p>
       <button class="btn-primary" style="margin-top:12px;" onclick="Play.saveCountdown321()">Save Round &amp; Continue</button>
     `;
   },
@@ -600,6 +598,27 @@ var Play = {
     App.render();
   },
 
+  // Shared by every per-player entry form. Only collapsible=true forms get
+  // the chevron: Hand & Foot and Phase 10 always (they never inline,
+  // regardless of density), and the inline-eligible games (Simple, Skull
+  // King, Whoa Cowboy, Countdown321) only in Comfortable — their Compact
+  // view is already a single row with nothing left to collapse.
+  unitLabelHtml(nameHtml, collapsible) {
+    if (!collapsible) return `<div class="unit-label">${nameHtml}</div>`;
+    return `
+      <div class="unit-label-row">
+        <div class="unit-label">${nameHtml}</div>
+        <button type="button" class="collapse-toggle" onclick="Play.toggleCollapse(this)" aria-label="Collapse player">&#9662;</button>
+      </div>
+    `;
+  },
+
+  // Collapsing just hides everything but the name/chevron row — pure CSS,
+  // no re-render, so nothing typed into other players' fields is lost.
+  toggleCollapse(el) {
+    el.closest(".entry-unit-block").classList.toggle("collapsed");
+  },
+
   toggleManualSwitch(el, isPhaseComplete) {
     el.classList.toggle("on");
     if (isPhaseComplete) return; // just a flag, no field swap
@@ -617,42 +636,52 @@ var Play = {
     document.getElementById("rookManualFields").classList.toggle("hidden", !on);
   },
 
-  setCountdown321Type(el, type) {
-    const container = document.getElementById("c321-declType");
-    container.querySelectorAll("button").forEach(b => b.classList.remove("on"));
-    el.classList.add("on");
-    container.dataset.selected = type;
-    this.updateCountdown321Lock();
-  },
+  // Checking a Countdown/Blastoff checkbox for one player disables every
+  // other declaration checkbox (any player, any type) — only one person can
+  // declare per round. It also disables the *other* checkbox on the same
+  // player (can't declare both). Checking Blastoff locks that player's
+  // total to 0, since their whole hand was discarded. Unchecking re-enables
+  // everything. Deliberately DOM-only, no re-render — so totals already
+  // typed for other players survive someone changing their mind.
+  setCountdown321Declaration(checkbox) {
+    const unitId = checkbox.dataset.unit;
+    const type = checkbox.dataset.type;
+    const totalInput = document.getElementById(`c321-total-${unitId}`);
 
-  // Locks the declared Blastoff player's hand-total input to 0 (their whole
-  // hand was discarded) and unlocks everyone else. Deliberately does NOT
-  // re-render the form — this only touches the DOM directly, so any hand
-  // totals already typed for other players survive toggling the
-  // declaration type or switching who declared.
-  updateCountdown321Lock() {
-    const type = document.getElementById("c321-declType").dataset.selected || "countdown";
-    const declaredById = document.getElementById("c321-declaredBy").value;
-    document.querySelectorAll(".c321-total").forEach(input => {
-      const unitId = input.id.replace("c321-total-", "");
-      if (type === "blastoff" && unitId === declaredById) {
-        input.value = "0";
-        input.disabled = true;
-      } else {
-        input.disabled = false;
+    if (checkbox.checked) {
+      document.querySelectorAll(".c321-declare-cb").forEach(cb => {
+        if (cb === checkbox) return;
+        cb.checked = false;
+        cb.disabled = true;
+      });
+      if (type === "blastoff") {
+        totalInput.value = "0";
+        totalInput.disabled = true;
       }
-    });
+    } else {
+      document.querySelectorAll(".c321-declare-cb").forEach(cb => { cb.disabled = false; });
+      if (type === "blastoff") totalInput.disabled = false;
+    }
   },
 
   clearCountdown321FieldErrors(game) {
-    game.units.forEach(u => this.clearFieldError(`c321-total-${u.id}`));
+    game.units.forEach(u => {
+      this.clearFieldError(`c321-total-${u.id}`);
+      this.clearFieldError(`c321-declare-countdown-${u.id}`);
+    });
   },
 
   saveCountdown321() {
     const game = App.state.game;
     this.clearCountdown321FieldErrors(game);
-    const declarationType = document.getElementById("c321-declType").dataset.selected || "countdown";
-    const declaredById = document.getElementById("c321-declaredBy").value;
+
+    const declaredCb = document.querySelector(".c321-declare-cb:checked");
+    if (!declaredCb) {
+      this.flagFieldError(`c321-declare-countdown-${game.units[0].id}`, "*Check who declared Countdown or Blastoff");
+      return;
+    }
+    const declarationType = declaredCb.dataset.type;
+    const declaredById = declaredCb.dataset.unit;
 
     const rawEntries = {};
     for (const u of game.units) {
