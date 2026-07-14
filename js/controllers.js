@@ -54,7 +54,7 @@ var Density = {
     const compact = this.get() === "compact";
     return `
       <div class="density-toggle-quiet">
-        <button class="density-quiet-btn" onclick="Density.toggle()">${compact ? "Comfortable view" : "Compact view"}</button>
+        <button class="density-quiet-btn" onclick="Density.toggle()">Switch to ${compact ? "Comfortable" : "Compact"} view</button>
       </div>
     `;
   }
