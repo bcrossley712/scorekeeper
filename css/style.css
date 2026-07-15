@@ -196,20 +196,16 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
    `display:contents` so its children join that same flex row directly,
    instead of staying nested as one block-level item. */
 .entry-grid.is-compact.inline-fields .entry-unit-block{
-  display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
+  display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;
 }
 .entry-grid.is-compact.inline-fields .unit-label{
-  /* flex-basis was "auto", which resolves to the name's full un-shrunk
-     content width (nowrap) for the purpose of flex-wrap's line-assignment
-     pass — shrinking only happens *after* an item is assigned to a line.
-     A longer name (Jessica, Joseph) therefore claimed more hypothetical
-     width up front, leaving no room for the field-row group and pushing
-     it to wrap onto its own line, even though 5-char names like Brian
-     fit fine. Giving it a fixed small basis (matching min-width) means
-     line-assignment always treats it as this size; flex-grow:1 still lets
-     it expand into any leftover space, and overflow/ellipsis still
-     truncates a name that doesn't fit even at full grown width. */
-  flex:1 1 44px; min-width:44px; margin-bottom:0;
+  /* flex-basis fixed (not "auto") so line-assignment during flex-wrap
+     treats every row's name as the same size, keeping field columns
+     aligned regardless of name length (see comment history below).
+     min-width raised from 44px to 64px to give typical names (5-8
+     characters) room to render in full before falling back to ellipsis
+     for genuinely long ones. */
+  flex:1 1 64px; min-width:64px; margin-bottom:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .entry-grid.is-compact.inline-fields .structured-fields,
@@ -226,13 +222,13 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 }
 .entry-grid.is-compact.inline-fields .field-row input.input-compact,
 .entry-grid.is-compact.inline-fields .field-row select{
-  width:2.2rem; padding:6px 2px; font-size:13px; text-align:center;
+  width:1.9rem; padding:6px 1px; font-size:13px; text-align:center;
 }
 /* Most fields (Bid, Won, cards left, etc.) only ever need 2 digits. A few
    (Bonus, running token totals) can realistically run to 3 — tagged with
    .digits-3 in the markup rather than guessing from the field itself. */
 .entry-grid.is-compact.inline-fields .field-row input.input-compact.digits-3{
-  width:2.8rem;
+  width:2.3rem;
 }
 .entry-grid.is-compact.inline-fields .check-inline{ font-size:12px; gap:5px; }
 .entry-grid.is-compact.inline-fields .check-inline input[type="checkbox"]{ width:16px; height:16px; }

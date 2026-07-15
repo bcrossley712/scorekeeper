@@ -9,6 +9,27 @@ then describe what you want to do next.
 bottom for what changed and why. Keep entries here to durable facts and current state, not a narrated
 history of how each bug was found and fixed — that's what git history is for.
 
+## Usage-efficiency expectations for Claude
+- **Assume the code in this conversation is current** unless told otherwise. Don't re-pull the full
+  repo/tarball if it's already been fetched this session — re-fetch only when told something changed
+  outside the conversation, or at the very start of a new session.
+- **Pull or view only what the task touches.** Grep for the specific function/selector/section first,
+  then view a targeted range — don't read whole files (or the whole repo) to make a small, well-scoped
+  change.
+- **Match verification effort to the change.** Only run the test suite (or extend it) when a change
+  touches actual logic. Skip it for CSS, copy, layout, or other changes it can't meaningfully verify.
+- **Don't build throwaway tooling** (scratch repro files, sandboxes, etc.) to double-check something
+  reasoning from the code and docs can already answer — only build a repro when there's a real, otherwise
+  unresolvable uncertainty.
+- **Keep this file itself lean.** Record current state and the *why* behind decisions, not a
+  session-by-session diary of how each bug was found and fixed — that history belongs in git commits, not
+  here. If this file starts creeping back up in size, trim it rather than let it compound.
+- **Deliver only the files that actually changed**, not a full re-zip of the project.
+- **Check in before packaging/shipping** — confirm the plan or show the diff before finalizing files,
+  even for a single-file change, unless clearly told to just go ahead.
+- **Batch related changes** into one pass rather than iterating file-by-file across separate turns when
+  the scope is already clear.
+
 ## What this is
 A local-first, offline-capable PWA for tracking scores in family card games. No server, no accounts —
 everything (players, house rules, game history) lives in the browser's localStorage on whichever device
