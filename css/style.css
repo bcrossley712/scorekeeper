@@ -196,17 +196,26 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
    `display:contents` so its children join that same flex row directly,
    instead of staying nested as one block-level item. */
 .entry-grid.is-compact.inline-fields .entry-unit-block{
-  display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;
+  /* flex-wrap was the root of the recurring problem: whenever content
+     didn't fit, the browser's answer was to shove some item onto a new
+     line, which either broke column alignment (fields wrapping below the
+     name) or forced the name to truncate to keep everything on one line.
+     Neither is what we want. Turning off wrap removes that failure mode
+     entirely: the field columns (fixed width) never move, and the name
+     — the only flexible-width piece — is left to make room for itself,
+     via normal text wrapping inside its own box, not the whole row's
+     layout reflowing. */
+  display:flex; flex-wrap:nowrap; align-items:center; gap:6px 8px;
 }
 .entry-grid.is-compact.inline-fields .unit-label{
-  /* flex-basis fixed (not "auto") so line-assignment during flex-wrap
-     treats every row's name as the same size, keeping field columns
-     aligned regardless of name length (see comment history below).
-     min-width raised from 44px to 64px to give typical names (5-8
-     characters) room to render in full before falling back to ellipsis
-     for genuinely long ones. */
-  flex:1 1 64px; min-width:64px; margin-bottom:0;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  /* No more ellipsis/truncation. If a name is genuinely too long for the
+     remaining space, it wraps to a second line within its own box —
+     the row just gets a bit taller — rather than being cut off or
+     dragging the fields out of alignment. Should rarely trigger now that
+     the manual-toggle glyph (see .toggle-row below) no longer eats into
+     this budget. */
+  flex:1 1 64px; min-width:64px; margin-bottom:0; white-space:normal;
+  word-break:break-word; line-height:1.15;
 }
 .entry-grid.is-compact.inline-fields .structured-fields,
 .entry-grid.is-compact.inline-fields .c321-fields{
@@ -232,20 +241,13 @@ h4{ font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#8a7f70
 }
 .entry-grid.is-compact.inline-fields .check-inline{ font-size:12px; gap:5px; }
 .entry-grid.is-compact.inline-fields .check-inline input[type="checkbox"]{ width:16px; height:16px; }
-/* The sandbox's manual-override control was a single small "⋯" button —
-   no separate switch widget alongside it. Match that here: hide the label
-   entirely and strip the switch down to just the glyph, no track/knob. */
-.entry-grid.is-compact.inline-fields .toggle-row{
-  order:99; flex:0 0 auto; margin-bottom:0; gap:0;
-}
-.entry-grid.is-compact.inline-fields .toggle-label-full,
-.entry-grid.is-compact.inline-fields .toggle-label-short{ display:none; }
-.entry-grid.is-compact.inline-fields .switch{
-  width:auto; height:auto; background:none; border-radius:0;
-  padding:4px 2px; position:relative;
-}
-.entry-grid.is-compact.inline-fields .switch::before{ content:"\22EF"; font-size:18px; font-weight:800; color:#a89b82; line-height:1; }
-.entry-grid.is-compact.inline-fields .switch .knob{ display:none; }
+/* Manual-override entry is now Comfortable-view-only. The glyph was
+   competing with the name for width every time this layout got touched,
+   and it's a rarely-used fallback — not worth the recurring layout fight.
+   If a row was already switched to manual before Compact was turned on,
+   its manual-input field still displays; there's just no way to toggle
+   it from here — switch to Comfortable to do that. */
+.entry-grid.is-compact.inline-fields .toggle-row{ display:none; }
 .entry-grid.is-compact.inline-fields .manual-fields{ flex:0 0 auto; }
 .entry-grid.is-compact.inline-fields .manual-fields input{ width:4.5rem; padding:6px 8px; font-size:13px; }
 /* Simple games (bare "num-input", no field-row wrapper at all) still need
